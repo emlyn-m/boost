@@ -2,8 +2,6 @@ use crate::block;
 
 use bitvec::prelude::*;
 use std::collections::BTreeSet;
-use std::cmp::min;
-
 
 pub struct Message {
     pub msg_id: u8, // actually only 5 bits
@@ -34,9 +32,10 @@ impl Message {
         };
 
         new_msg.stored_blocks.insert(new_msg.msg_id);
-        let payload_range = block::BLOCK_PAYLD_RANGE.start..min(block::BLOCK_PAYLD_RANGE.end, first_block.data.len());
-        for i in payload_range {
-            new_msg.payload.insert(i-block::BLOCK_PAYLD_RANGE.start, first_block.data.get(i..=i).unwrap().load::<u8>() == 1);
+        let payload_range_start = if is_multipart { block::BLOCK_MPPAY_RANGE.start } else { block::BLOCK_PAYLD_RANGE.start };
+        
+        for i in payload_range_start..first_block.data.len() {
+            new_msg.payload.insert(i-payload_range_start, first_block.data.get(i..=i).unwrap().load::<u8>() == 1);
         }
 
         new_msg
@@ -60,8 +59,9 @@ impl Message {
         while *stb_iter.next_back().unwrap() > new_block_idx {} // iterators are mutable so this approach doesnt work
         let payload_cutoff_point: usize = (*stb_iter.next().unwrap() as usize) * (block::NON_MP_OCTETS as usize);
 
-        for i in block::BLOCK_PAYLD_RANGE {
-            self.payload.insert(payload_cutoff_point+i-block::BLOCK_PAYLD_RANGE.start, new_block.data.get(i..=i).unwrap().load::<u8>() == 1);
+        let payld_range_start = if self.is_multipart { block::BLOCK_MPPAY_RANGE.start } else { block::BLOCK_PAYLD_RANGE.start };
+        for i in payld_range_start..block::BLOCK_MPPAY_RANGE.end {
+            self.payload.insert(payload_cutoff_point+i-payld_range_start, new_block.data.get(i..=i).unwrap().load::<u8>() == 1);
         }
     }
 

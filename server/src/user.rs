@@ -28,7 +28,7 @@ impl User {
             unused_ids: vec![]
         };
 
-        for i in 0..1<<8 {
+        for i in 1<<4..1<<5 {
             new_user.unused_ids.push(i as u8);
         }
 
@@ -44,10 +44,9 @@ impl User {
         
     }
 
-    pub fn receive_block(&mut self, new_block: &mut block::Block) -> (block::BlockReceivedAction, u8) {
+    pub fn receive_block(&mut self, new_block: &mut block::Block) -> (block::BlockReceivedAction, u8) { // return s and action and (in all instances - the block index)
 
         let msg_id = new_block.data.get(block::BLOCK_MSGID_RANGE).unwrap().load::<u8>();
-        println!("MsgId: {}", msg_id);
         let is_multipart = new_block.data.get(block::BLOCK_ISMLP_RANGE).unwrap().load::<u8>() == 1;
         let block_idx = if is_multipart { new_block.data.get(block::BLOCK_MPIDX_RANGE).unwrap().load::<u8>() } else { 0 };
         
@@ -84,28 +83,32 @@ impl User {
         let payload_size: usize = if self.is_encrypted { 139 } else { 140 };
         
         let new_msg_id = self.unused_ids.pop().expect("No available id"); // todo: proper error handling
+
+        
         // header size: 1 octet singlepart, 2 octets multipart
         let num_blocks = new_message.len().div_ceil(payload_size - 2) as usize;
         let mut output_blocks = Vec::<BitVec::<u8,Lsb0>>::new();
 
-        let mut block0 = bitvec![u8, Lsb0; 0; payload_size*8];
+        let header_size = if num_blocks == 1 { block::BLOCK_PAYLD_RANGE.start } else { block::BLOCK_MPPAY_RANGE.start };
+        
+        let mut block0 = bitvec![u8, Lsb0; 0; header_size];
         block0[0..5].store::<u8>(new_msg_id);
         block0[5..6].store::<u8>(if is_command { 1 } else { 0 });
-        block0[6..7].store::<u8>(if num_blocks == 1 { 1 } else { 0 }); // is_mp
-        block0[7..8].store::<u8>(if num_blocks == 1 { 1 } else { 0 }); // mp_first
-        block0[8..16].store::<u8>((num_blocks - 1) as u8);
+        block0[6..7].store::<u8>(if num_blocks > 1 { 1 } else { 0 }); // is_mp
+        block0[7..8].store::<u8>(if num_blocks > 1 { 1 } else { 0 }); // mp_first
+        if num_blocks > 1 { block0[8..16].store::<u8>((num_blocks - 1) as u8) };
         for i in 0..std::cmp::min(new_message.len(), (payload_size-2)*8) {
             block0.push(new_message[i]);
         }
         output_blocks.push(block0);
 
         for i in 1..num_blocks {
-            let mut new_block = bitvec![u8, Lsb0; 0; payload_size*8];
+            let mut new_block = bitvec![u8, Lsb0; 0; header_size];
             new_block[0..5].store::<u8>(new_msg_id);
             new_block[5..6].store::<u8>(if is_command { 1 } else { 0 });
             new_block[6..7].store::<u8>(if num_blocks == 1 { 1 } else { 0 });
             new_block[7..8].store::<u8>(0);
-            new_block[8..16].store::<u8>((i - 1) as u8);
+            if num_blocks > 1 { new_block[8..16].store::<u8>((i - 1) as u8); }
             for j in 0..std::cmp::min(new_message.len() - (payload_size - 2)*8*i, (payload_size - 2)*8) {
                 new_block.push(new_message[i*(payload_size - 2)*8 + j]);
             }

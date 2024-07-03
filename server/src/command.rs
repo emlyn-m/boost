@@ -1,6 +1,6 @@
 use bitvec::prelude::*;
 
-pub const COMMAND_BITLENGTH: usize = 4;
+pub const COMMAND_BITLENGTH: usize = 8;
 pub type CommandInt = u8;
 
 

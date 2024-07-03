@@ -86,11 +86,11 @@ fn main() {
 
 }
 
-fn send_block_ack(sender: &mut user::User, action_data: u8, new_block_msgid: u8) {
-    let mut block_ack_payload = bitvec![u8, Lsb0; 0; command::COMMAND_BITLENGTH + 13]; // +5 for msgId, +8 for blockIdx
+fn send_block_ack(sender: &mut user::User, block_idx: u8, new_block_msgid: u8) {
+    let mut block_ack_payload = bitvec![u8, Lsb0; 0; command::COMMAND_BITLENGTH + 16]; // +8 for msgId, +8 for blockIdx
     block_ack_payload[0..command::COMMAND_BITLENGTH].store::<command::CommandInt>(command::CommandValue::BlockAck as command::CommandInt);
-    block_ack_payload[command::COMMAND_BITLENGTH..command::COMMAND_BITLENGTH + 5].store::<u8>(new_block_msgid);
-    block_ack_payload[command::COMMAND_BITLENGTH+5..command::COMMAND_BITLENGTH+8].store::<u8>(action_data); // block idx
+    block_ack_payload[command::COMMAND_BITLENGTH..command::COMMAND_BITLENGTH + 8].store::<u8>(new_block_msgid); 
+    block_ack_payload[command::COMMAND_BITLENGTH+8..command::COMMAND_BITLENGTH+16].store::<u8>(block_idx);
     sender.send_message(block_ack_payload, true);
 }
 

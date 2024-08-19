@@ -31,6 +31,7 @@ impl Block {
     }
 }
 
+#[derive(Debug)]
 pub enum BlockReceivedAction {
     SendBlockAck, // Ordinary, multipart block received
     ProcessMessage, // Received singlepart block / all of multipart block

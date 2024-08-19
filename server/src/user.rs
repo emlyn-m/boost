@@ -2,6 +2,7 @@ use crate::block;
 use crate::message;
 
 use bitvec::prelude::*;
+use x25519_dalek;
 
 use std::collections::HashMap;
 use std::io::Write; 
@@ -14,6 +15,7 @@ pub struct User {
     pub unused_ids: Vec::<u8>,
 
     // todo: encryption parameters
+    pub shared_secret: [u8; 32],
 
     // todo: matrix properties
 }
@@ -25,7 +27,8 @@ impl User {
             address: addr,
             is_encrypted: is_enc,
             messages: HashMap::new(), // hashmap over <msgId, Message>
-            unused_ids: vec![]
+            unused_ids: vec![],
+            shared_secret: [0; 32],
         };
 
         for i in 1<<4..1<<5 {
@@ -86,7 +89,7 @@ impl User {
 
         
         // header size: 1 octet singlepart, 2 octets multipart
-        let num_blocks = new_message.len().div_ceil(payload_size - 2) as usize;
+        let num_blocks = new_message.len().div_ceil(8 * (payload_size - 2)) as usize;
         let mut output_blocks = Vec::<BitVec::<u8,Lsb0>>::new();
 
         let header_size = if num_blocks == 1 { block::BLOCK_PAYLD_RANGE.start } else { block::BLOCK_MPPAY_RANGE.start };
@@ -109,7 +112,7 @@ impl User {
             new_block[6..7].store::<u8>(if num_blocks == 1 { 1 } else { 0 });
             new_block[7..8].store::<u8>(0);
             if num_blocks > 1 { new_block[8..16].store::<u8>((i - 1) as u8); }
-            for j in 0..std::cmp::min(new_message.len() - (payload_size - 2)*8*i, (payload_size - 2)*8) {
+            for j in 0..std::cmp::min(new_message.len() - (payload_size - 2)*8*i, (payload_size - 2)*8) { // why: is there a -2??
                 new_block.push(new_message[i*(payload_size - 2)*8 + j]);
             }
             output_blocks.push(new_block);
@@ -123,6 +126,22 @@ impl User {
         for i in 0..num_blocks as usize {
             let _ = outfile.write(&(output_blocks[i].as_raw_slice()));
         }
+
+    }
+
+    pub fn key_exchange(&mut self, msg: &BitVec<u8, Lsb0>) -> [u8;32] {
+
+        let rng = rand::thread_rng();
+        let server_secret = x25519_dalek::EphemeralSecret::random_from_rng(rng);
+        let server_public = x25519_dalek::PublicKey::from(&server_secret);    
+
+        let other_public = x25519_dalek::PublicKey::from(<&[u8] as TryInto<[u8;32]>>::try_into(msg.as_raw_slice()).expect("Conversion of PK into array failed!!")); // fixme: Handle bad sized input
+        let shared_secret = server_secret.diffie_hellman(&other_public).to_bytes();
+
+        self.shared_secret = shared_secret;
+
+        return server_public.to_bytes();
+
 
     }
 

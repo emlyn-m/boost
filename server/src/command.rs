@@ -5,6 +5,7 @@ pub type CommandInt = u8;
 
 
 #[repr(u8)]
+#[derive(Debug)]
 pub enum CommandValue {
     // cryptography
     DhkeInit = 1, // 1 of these each way...

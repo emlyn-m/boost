@@ -55,7 +55,7 @@ fn main() {
             None => { continue; },
             Some(v) => { v }
         };
-        let new_block_msgid = new_block.data.get(block::BLOCK_MSGID_RANGE).unwrap().load::<u8>();
+        let new_block_msgid = new_block.data.get(block::BLOCK_MSGID_RANGE).unwrap().load::<u8>(); // fixme: randomly panicked here but maybe its fine ig :/
 
         let sender_addr = new_block.addr.clone();
 
@@ -63,7 +63,7 @@ fn main() {
             users.insert(sender_addr.clone(), user::User::new(sender_addr.clone(), false));
         }
 
-        let sender = users.get_mut(&sender_addr).unwrap();
+        let sender = users.get_mut(&sender_addr).unwrap(); // sender is a &mut
 
         if sender.is_encrypted {
             sender.decrypt_block(&mut new_block);
@@ -74,9 +74,10 @@ fn main() {
             block::BlockReceivedAction::SendBlockAck => { send_block_ack(sender, action_data, new_block_msgid); },
             block::BlockReceivedAction::BlockInvalid => (), // todo:
             block::BlockReceivedAction::ProcessMessage => { 
-                process_message(sender, sender.messages.get(&new_block_msgid).expect("Failed to get message from sender list by block id"));
                 send_block_ack(sender, action_data, new_block_msgid);
+                process_message(sender, new_block_msgid);
             }, // todo: this should send a message
+            // todo: ok yeah we need to find a way to do match statements without 
         }
 
         
@@ -87,6 +88,8 @@ fn main() {
 }
 
 fn send_block_ack(sender: &mut user::User, block_idx: u8, new_block_msgid: u8) {
+    // todo: include length checks, for now we won't bother (oh boy sure hope this doesn't surprise me later)
+
     let mut block_ack_payload = bitvec![u8, Lsb0; 0; command::COMMAND_BITLENGTH + 16]; // +8 for msgId, +8 for blockIdx
     block_ack_payload[0..command::COMMAND_BITLENGTH].store::<command::CommandInt>(command::CommandValue::BlockAck as command::CommandInt);
     block_ack_payload[command::COMMAND_BITLENGTH..command::COMMAND_BITLENGTH + 8].store::<u8>(new_block_msgid); 
@@ -94,11 +97,30 @@ fn send_block_ack(sender: &mut user::User, block_idx: u8, new_block_msgid: u8) {
     sender.send_message(block_ack_payload, true);
 }
 
-fn process_message(sender: &user::User, msg: &message::Message) {
+// Wrapper function to User.send_message for commands
+fn send_command(sender: &mut user::User, command_type: command::CommandInt, payload: &mut BitVec::<u8,Lsb0>) {
+    // todo: include length checks, for now we won't bother (oh boy sure hope this doesn't surprise me later)
+
+
+    let mut new_payload = bitvec![u8, Lsb0; 0; command::COMMAND_BITLENGTH + payload.len()];
+    new_payload[0..command::COMMAND_BITLENGTH].store::<command::CommandInt>(command_type);
+    new_payload.append(payload);
+    sender.send_message(new_payload, true);
+}
+
+fn process_message(sender: &mut user::User, msg_id: u8) {
+
+    let msg = sender.messages.get(&msg_id).expect("Failed to get message while processing");
+
+
     if msg.is_command {
         let command_type = command::Command::get_matching_command(&msg.payload);
+        let actual_payload = msg.payload.clone().split_off(8); // remove the command id from the message
         match command_type {
-            command::CommandValue::DhkeInit => {  }
+            command::CommandValue::DhkeInit => { 
+                let shared_secret = sender.key_exchange(&actual_payload); 
+                send_command(sender, command::CommandValue::DhkeInit as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(shared_secret.to_vec()))
+            }
             command::CommandValue::DhkeValidate => {  }
             command::CommandValue::AuthenticateNewAccount => {  }
             command::CommandValue::RequestKnownUsers => {  }

@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 bitvec = "1.0.1"
 matrix-sdk = "0.7.1"
+rand = "0.8.5"
+x25519-dalek = "2.0.1"

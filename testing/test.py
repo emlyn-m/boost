@@ -1,7 +1,19 @@
 #!/usr/bin/env python3
 import os
+import time
 import bitstring
-bitstring.lsb0 = True
+import random
+import x25519
+bitstring.lsb0 = False
+
+LOG_LEVELS = {
+    "debug": 0,
+    "prod": 10,
+}
+LOG_LEVEL_NAMES = {
+    0:"debug",
+    10:"prod",
+}
 
 COMMANDS = {
     "DATA_MODE": 0,
@@ -10,6 +22,18 @@ COMMANDS = {
     "AuthenticateNewAccount": 4,
     "RequestKnownUsers": 7,
 }
+INCOMING_COMMANDS = {
+    1: "DhkeInit",
+    2: "DhkeValidate",
+    3: "Unencrypted",
+    5: "DomainUnlinked",
+    6: "Target user not found",
+    8: "Error",
+    9: "Invalid command",
+    10: "Duplicate block",
+    11: "Block Ack"
+}
+
 
 SHAREDMEM_SERVEROUT_PATH = "C:/Users/emlyn/Documents/code/boost/sharedmem/server_output/"
 SHAREDMEM_SERVERIN_PATH  = "C:/Users/emlyn/Documents/code/boost/sharedmem/server_input/"
@@ -17,89 +41,134 @@ SHAREDMEM_SERVERIN_PATH  = "C:/Users/emlyn/Documents/code/boost/sharedmem/server
 DOC_MSG = "Testing CLI for boost\nUse ^C to enter input mode, and type .help for a list of available commands\n"
 HELP_MSG = "\
 .help                               Show this message\n\
+.loglevel [debug|prod]              Set the level used for logging\n\
 .ph [phone number]                  Switch the testing phone number\n\
 .init                               Setup a communication channel\n\
 .auth [user]@[domain] [password]    Authenticate a given user@domain account\n\
 .send [target@t_domain] [msg]       Send a message to target@t_domain\n\
 "
 
-global globalMsgId
-globalMsgId = 0
 
-global phNo
+class User:
+    def __init__(self, phonenumber):
+        self.phNo = phonenumber
+        self.loglevel = LOG_LEVELS["prod"]
+        self.msg_id = 0
+        self.commsEncrypted = False
 
-def sendMessage(phNo, command, payload):
-    global globalMsgId
-    globalMsgId += 1
-    assert(len(str(payload)) < 139)
+        self.secret = None
+        self.public = None
+        self.shared_secret = None
+        
 
-    msg = None
-    if command == "DhkeInit":
-        msg = bitstring.pack("u5, bool, bool, bool, hex:308", globalMsgId, False, False, False, payload).tobytes()
-        if command != "DATA_MODE":
-            msg= bitstring.pack("u5, bool, bool, bool, hex:308", globalMsgId, True, False, False, payload).tobytes()
-    else:
-        msg = bitstring.pack('u5, bool, bool, bool, bytes:139', globalMsgId, False, False, False, payload).tobytes()
-        if command != "DATA_MODE":
-            msg = bitstring.pack('u5, bool, bool, bool, uint:8, bytes:139', globalMsgId, True, False, False, COMMANDS[command], payload).tobytes();
+    def send_msg(self, command, payload): # todo: make this support multipart messages
+        self.msg_id+=1
+        msg = bitstring.pack("bool, bool, bool, u5, uint:8, hex", True, False, True, self.msg_id, COMMANDS[command], payload)
+        if command == 'DATA_MODE':
+            msg = bitstring.pack("bool, bool, bool, u5, hex", True, False, False, self.msg_id, payload)
 
-    with open(SHAREDMEM_SERVERIN_PATH + phNo, 'wb') as of:
-        print(f"Sending message with id {globalMsgId}")
-        of.write(msg)
+        msg = msg.tobytes()
+        with open(SHAREDMEM_SERVERIN_PATH + self.phNo, 'wb') as of:
+            self.display(f"Sending message with id {self.msg_id} [bin {bin(int(msg.hex(), 16))}]", loglevel=0)
+            of.write(msg)
 
+    def display(self, msg, loglevel=LOG_LEVELS["prod"], type="normal"): # todo: color
 
-def display(msg, logLevel=""):
-    if logLevel:
-        print(f"{logLevel}: {msg}")
-    else:
-        print(f"{msg}")
+        x1bPrefix = ""
+        if type == "warn":
+            x1bPrefix = "\x1b[33m"
+        if type == "error":
+            x1bPreifx = "\x1b[1m\x1b[31m"
 
-def convertTextToCommand(ph):
-    inp = input("\n>>> ")
-    if inp == ".help":
-        print(HELP_MSG)
-    
-    elif inp.split(" ")[0] == ".ph":
-        global phNo
-        phNo = inp.split(" ")[1]
+        if (loglevel >= self.loglevel):
+            print(f"{x1bPrefix}[{LOG_LEVEL_NAMES[loglevel]}] {msg}\x1b[0m")
 
-    elif inp == ".init":
-        dhKey = 0x66c808e6b5be6d6620934bc6ffa2b8b47f9786c002bfb06d53a0c27535641a5d # chosen by dice roll, guaranteed to be random
-        sendMessage(ph, "DhkeInit", str(dhKey))
-
-    else:
-        print("Unimplemented / Unknown command")
-
-
-
-def main():
-    print(DOC_MSG)
-    global phNo
-    phNo = input("Phone number for testing >> ")
-    commsEncrypted = 0
-    
-    def serverMainLoop():
+    def receive(self):
         while True:
             for serverOutput in os.scandir(SHAREDMEM_SERVEROUT_PATH):
-                display(f"New SharedMemServerOutput file created ({serverOutput.path})", "DEBUG")
-                serverMsg = open(serverOutput.path).read()
-                if (commsEncrypted):
+                time.sleep(1)
+                serverMsg = open(serverOutput.path, 'rb').read()
+                if (self.commsEncrypted):
                     pass #todo: decrypt or whatever
                 
-                display(f"Server replied: {serverMsg} + hex[0x{bytes(serverMsg, 'utf-8').hex()}]")
-
+                self.display(f"Server replied: hex[0x{serverMsg}]", loglevel=LOG_LEVELS["debug"])
                 os.system(f"del {serverOutput.path.replace("/", "\\")}")
 
+                self.process(serverMsg)
+    
+    def process(self, msg):
+        msgHex = bitstring.BitArray(msg)
+        values = msgHex.unpack("bool, bool, bool, u5, uint:8, hex")
+        print(f"ID: {values[3]}\nCOMMAND: {INCOMING_COMMANDS[values[4]]}")
+
+        # Special handling
+        if values[4] == 1:
+            # DhkeInit
+            sp = values[5][::-1][:64][::-1]
+
+            server_form_spublic = [int(sp[i] + sp[i+1], 16) for i in range(0, 64, 2)]
+            self.display(f"Server public: {server_form_spublic}", loglevel=LOG_LEVELS['debug'])
+
+            server_form_cpublic = [int(self.public[i] + self.public[i+1], 16) for i in range(0, 64, 2)]
+            self.display(f"Client public: {server_form_cpublic}", loglevel=LOG_LEVELS["debug"])
+
+            shared_secret = x25519.scalar_mult(bytes.fromhex(self.secret), bytes.fromhex(sp))
+            self.shared_secret = str(shared_secret.hex())
+            self.display(f"SHARED SECRET: {self.shared_secret}")
+
+            server_form = [int(self.shared_secret[i] + self.shared_secret[i+1], 16) for i in range(0, 64, 2)]
+
+            self.display(f"Server form of shared secret: {server_form}", loglevel=LOG_LEVELS['debug'])
+
+        else:
+            print(f"PAYLOAD: {values[5]}\n")
+        
+        
+
+    def command_input(self):
+        target = input(">>> ")
+        
+        if target.startswith(".help"):
+            print(HELP_MSG)
+        
+        elif target.startswith(".loglevel"):
+            if len(target.split(" ")) != 2:
+                self.display("Must specifiy a log level", type="error")
+                return
+            if not target.split(" ")[1] in LOG_LEVELS:
+                self.display("Unknown log level", type="error")
+                return
+            self.loglevel = LOG_LEVELS[target.split(" ")[1]]
+
+        elif target.startswith(".ph"):
+            if len(target.split(' ')) != 2:
+                self.display("Must specify a phone number", type="error")
+            try:
+                self.phNo = str(int(target.split(" ")[1]))
+            except ValueError:
+                self.display("Phone number must be an int", type="error")
+        
+        elif target == ".init":
+            self.secret = "1d65cf71e2c9d940fccf2f72de788842fe70f14db1baf96f2a656a753594dfd4"
+            self.public = str(x25519.scalar_base_mult(bytes.fromhex(self.secret)).hex())
+
+            self.send_msg("DhkeInit", self.public)
+
+        else:
+            self.display("Unknown command", type="warn")
+
+def main():
+    print("\x1b[1mWelcome to Boost testing interface\x1b[0m\nUse ^C to enter input mode, and type .help for a list of available commands")
+    ph = str(int(input("Please enter a phone number: ")))
+    user = User(ph)
     while True:
         try:
-            serverMainLoop()
+            user.receive()
         except KeyboardInterrupt:
-            convertTextToCommand(phNo)
-
-
-        
-            
-
+            try:
+                user.command_input()
+            except (KeyboardInterrupt, EOFError):
+                exit()
 
 if __name__ == "__main__":
     main()

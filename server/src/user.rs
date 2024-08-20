@@ -82,7 +82,6 @@ impl User {
     }
 
     pub fn send_message(&mut self, new_message: BitVec::<u8,Lsb0>, is_command: bool) {
-        // todo: implement properly via sms
         let payload_size: usize = if self.is_encrypted { 139 } else { 140 };
         
         let new_msg_id = self.unused_ids.pop().expect("No available id"); // todo: proper error handling
@@ -122,6 +121,7 @@ impl User {
             // todo: implement encryption over each entry in output_blocks (if encrypted, each block will only be 139 octets of header/payload)
         }
 
+        // DEBUG CODE BELOW - REPLACE WHEN HARDWARE AVAILABLE
         let mut outfile = std::fs::File::create(crate::SHAREDMEM_OUTPUT.to_owned() + "/" + &self.address).expect("Failed to open sharedmem output");
         for i in 0..num_blocks as usize {
             let _ = outfile.write(&(output_blocks[i].as_raw_slice()));

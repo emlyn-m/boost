@@ -29,6 +29,23 @@ impl Block {
             data,
         }
     }
+
+    pub fn block_size_validation(&self) -> bool {
+
+        println!("{}", self.data.len());
+        if self.data.len() < 16 {
+            return false; // 8 bit header, min 8 bit information
+        }
+        if (self.data.get(BLOCK_ISMLP_RANGE).unwrap().load::<u8>() == 1) && self.data.len() < 24 {
+            return false; // multipart specifically
+        }
+
+        if self.data.len() > 140 {
+            return false; // too big - should never happen on real hardware (can remove in prod)
+        }
+
+        return true
+    }
 }
 
 #[derive(Debug)]

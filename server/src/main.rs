@@ -55,6 +55,12 @@ fn main() {
             None => { continue; },
             Some(v) => { v }
         };
+        
+        if !new_block.block_size_validation() {
+            println!("Block incorrect size! Skipping");
+            continue;
+        }
+
         let new_block_msgid = new_block.data.get(block::BLOCK_MSGID_RANGE).unwrap().load::<u8>(); // fixme: randomly panicked here but maybe its fine ig :/
 
         let sender_addr = new_block.addr.clone();
@@ -76,8 +82,8 @@ fn main() {
             block::BlockReceivedAction::ProcessMessage => { 
                 send_block_ack(sender, action_data, new_block_msgid);
                 process_message(sender, new_block_msgid);
-            }, // todo: this should send a message
-            // todo: ok yeah we need to find a way to do match statements without 
+            },
+            
         }
 
         
@@ -135,7 +141,10 @@ fn process_message(sender: &mut user::User, msg_id: u8) {
 
     } else {
         // data messages cannot be sent if the user is unencrypted
-        if !sender.is_encrypted { return; } // todo: actually send a fail message
+        if !sender.is_encrypted { 
+            send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Messages cannot be sent before encryption is complete".as_bytes().to_vec())); 
+            return;
+        } 
 
         // todo: check if user has an account on that domain
         

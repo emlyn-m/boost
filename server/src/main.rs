@@ -119,7 +119,11 @@ fn process_message(sender: &mut user::User, msg_id: u8) {
         match command_type {
             command::CommandValue::DhkeInit => { 
                 let shared_secret = sender.key_exchange(&actual_payload); 
-                send_command(sender, command::CommandValue::DhkeInit as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(shared_secret.to_vec()))
+                match shared_secret {
+                    Ok(val) => send_command(sender, command::CommandValue::DhkeInit as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(val.to_vec())),
+                    Err(e) => send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()))
+                
+                }
             }
             command::CommandValue::DhkeValidate => {  }
             command::CommandValue::AuthenticateNewAccount => {  }

@@ -69,7 +69,7 @@ impl User {
                 return (block::BlockReceivedAction::SendBlockAck, block_idx);
             }
 
-            self.messages.get_mut(&msg_id).expect("could not retrieve message to insert new block in user::receive_block").add_block(new_block); // why tf is this being called on single part msgs
+            self.messages.get_mut(&msg_id).expect("could not retrieve message to insert new block in user::receive_block").add_block(new_block); // this is never called on single part msgs bc those will be caught by the if block (line 58)
         }
         
 
@@ -129,18 +129,24 @@ impl User {
 
     }
 
-    pub fn key_exchange(&mut self, msg: &BitVec<u8, Lsb0>) -> [u8;32] {
+    pub fn key_exchange(&mut self, msg: &BitVec<u8, Lsb0>) -> Result<[u8;32], &'static str> {
 
         let rng = rand::thread_rng();
         let server_secret = x25519_dalek::EphemeralSecret::random_from_rng(rng);
         let server_public = x25519_dalek::PublicKey::from(&server_secret);    
 
-        let other_public = x25519_dalek::PublicKey::from(<&[u8] as TryInto<[u8;32]>>::try_into(msg.as_raw_slice()).expect("Conversion of PK into array failed!!")); // fixme: Handle bad sized input
+        let other_public_bytes = match <&[u8] as TryInto<[u8;32]>>::try_into(msg.as_raw_slice()) {
+            Ok(v) => v,
+            Err(_) => return Err("Bad sized key")
+        };
+        
+    
+        let other_public = x25519_dalek::PublicKey::from(other_public_bytes);
         let shared_secret = server_secret.diffie_hellman(&other_public).to_bytes();
 
         self.shared_secret = shared_secret;
 
-        return server_public.to_bytes();
+        return Ok(server_public.to_bytes());
 
 
     }

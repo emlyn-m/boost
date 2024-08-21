@@ -55,13 +55,6 @@ fn main() {
             None => { continue; },
             Some(v) => { v }
         };
-        
-        if !new_block.block_size_validation() {
-            println!("Block incorrect size! Skipping");
-            continue;
-        }
-
-        let new_block_msgid = new_block.data.get(block::BLOCK_MSGID_RANGE).unwrap().load::<u8>(); // fixme: randomly panicked here but maybe its fine ig :/
 
         let sender_addr = new_block.addr.clone();
 
@@ -71,6 +64,14 @@ fn main() {
 
         let sender = users.get_mut(&sender_addr).unwrap(); // sender is a &mut
 
+        if !new_block.block_size_validation() {
+            send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Message missing header".as_bytes().to_vec()));
+            continue;
+        }
+
+        let new_block_msgid = new_block.data.get(block::BLOCK_MSGID_RANGE).unwrap().load::<u8>();
+
+
         if sender.is_encrypted {
             sender.decrypt_block(&mut new_block);
         }
@@ -78,7 +79,9 @@ fn main() {
         let (action, action_data) = sender.receive_block(&mut new_block);
         match action {
             block::BlockReceivedAction::SendBlockAck => { send_block_ack(sender, action_data, new_block_msgid); },
-            block::BlockReceivedAction::BlockInvalid => (), // todo:
+            block::BlockReceivedAction::BlockInvalid => {
+                send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::new());
+            },
             block::BlockReceivedAction::ProcessMessage => { 
                 send_block_ack(sender, action_data, new_block_msgid);
                 process_message(sender, new_block_msgid);

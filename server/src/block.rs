@@ -32,7 +32,6 @@ impl Block {
 
     pub fn block_size_validation(&self) -> bool {
 
-        println!("{}", self.data.len());
         if self.data.len() < 16 {
             return false; // 8 bit header, min 8 bit information
         }
@@ -40,7 +39,7 @@ impl Block {
             return false; // multipart specifically
         }
 
-        if self.data.len() > 140 {
+        if self.data.len() > 140*8 {
             return false; // too big - should never happen on real hardware (can remove in prod)
         }
 

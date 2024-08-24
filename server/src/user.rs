@@ -1,5 +1,6 @@
 use crate::block;
 use crate::message;
+use crate::outgoing_message;
 
 use bitvec::prelude::*;
 use x25519_dalek;
@@ -12,7 +13,8 @@ pub struct User {
     pub is_encrypted: bool,
 
     pub messages: HashMap<u8,message::Message>,
-    pub unused_ids: Vec::<u8>,
+    pub outgoing_messages: HashMap<u8, outgoing_message::OutgoingMessage>,
+    pub unused_ids: Vec::<u8>, // unused outgoing ids
 
     // todo: encryption parameters
     pub shared_secret: [u8; 32],
@@ -26,6 +28,7 @@ impl User {
         let mut new_user = User {
             address: addr,
             is_encrypted: is_enc,
+            outgoing_messages: HashMap::new(),
             messages: HashMap::new(), // hashmap over <msgId, Message>
             unused_ids: vec![],
             shared_secret: [0; 32],
@@ -81,7 +84,8 @@ impl User {
                 
     }
 
-    pub fn send_message(&mut self, new_message: BitVec::<u8,Lsb0>, is_command: bool) {
+    // todo: are we actually storing these messages for if an ack isnt received??
+    pub fn send_message(&mut self, new_message: BitVec::<u8,Lsb0>, is_command: bool, outgoing: bool) {
         let payload_size: usize = if self.is_encrypted { 139 } else { 140 };
         
         let new_msg_id = self.unused_ids.pop().expect("No available id"); // todo: proper error handling
@@ -121,6 +125,10 @@ impl User {
             // todo: implement encryption over each entry in output_blocks (if encrypted, each block will only be 139 octets of header/payload)
         }
 
+        if outgoing {
+            self.outgoing_messages.insert(new_msg_id, outgoing_message::OutgoingMessage::new(&output_blocks));
+        }
+
         // DEBUG CODE BELOW - REPLACE WHEN HARDWARE AVAILABLE
         let mut outfile = std::fs::File::create(crate::SHAREDMEM_OUTPUT.to_owned() + "/" + &self.address).expect("Failed to open sharedmem output");
         for i in 0..num_blocks as usize {
@@ -149,6 +157,29 @@ impl User {
         return Ok(server_public.to_bytes());
 
 
+    }
+
+    pub fn process_block_ack(&mut self, msg: &BitVec<u8,Lsb0>) -> Result<(), u8> {
+        // extract msg_id and block_id
+        let msg_id = msg.get(0..8).unwrap().load::<u8>(); // no error handling needed - any incoming messages have been validated as min 8 bytes
+        let block_id = match msg.get(8..16) {
+            Some(v) => v,
+            None => return Err(1),
+        }.load::<u8>();
+
+        let msg_obj = match self.outgoing_messages.get_mut(&msg_id) {
+            Some(v) => v,
+            None => return Err(0),
+        };
+
+        if msg_obj.acknowledge_block(&block_id) {
+            self.unused_ids.push(msg_id);
+            self.outgoing_messages.remove(&msg_id);
+        }
+        
+
+
+        return Ok(());
     }
 
 }

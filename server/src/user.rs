@@ -1,6 +1,8 @@
 use crate::block;
 use crate::message;
 use crate::outgoing_message;
+use crate::matrix_bot;
+use crate::credential_manager;
 
 use bitvec::prelude::*;
 use x25519_dalek;
@@ -19,7 +21,7 @@ pub struct User {
     // todo: encryption parameters
     pub shared_secret: [u8; 32],
 
-    // todo: matrix properties
+    pub matrix_bots: Vec::<matrix_bot::MatrixBot>,
 }
 
 impl User {
@@ -32,6 +34,7 @@ impl User {
             messages: HashMap::new(), // hashmap over <msgId, Message>
             unused_ids: vec![],
             shared_secret: [0; 32],
+            matrix_bots: vec![],
         };
 
         for i in 1<<4..1<<5 {
@@ -84,7 +87,6 @@ impl User {
                 
     }
 
-    // todo: are we actually storing these messages for if an ack isnt received??
     pub fn send_message(&mut self, new_message: BitVec::<u8,Lsb0>, is_command: bool, outgoing: bool) {
         let payload_size: usize = if self.is_encrypted { 139 } else { 140 };
         
@@ -180,6 +182,23 @@ impl User {
 
 
         return Ok(());
+    }
+
+    pub fn authenticate(&mut self, botcred: &credential_manager::BridgeBotCredentials) -> Result<u8, u8> {
+
+        if self.matrix_bots.len() > 256 {
+            return Err(0);
+        }
+
+        for bot in &self.matrix_bots {
+            if bot.bot_address == botcred.bot_address {
+                return Err(1);
+            }
+        }
+
+        self.matrix_bots.push(matrix_bot::MatrixBot::new(botcred.bot_address.clone(), botcred.service_name.clone()));
+
+        return Ok((self.matrix_bots.len() - 1).try_into().unwrap()); // unwrap is ok here because we disallow insertions if length > 256
     }
 
 }

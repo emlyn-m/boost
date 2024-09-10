@@ -4,6 +4,7 @@ mod message;
 mod command;
 mod outgoing_message;
 mod credential_manager;
+mod matrix_bot;
 
 use bitvec::prelude::*;
 use std::collections::HashMap;
@@ -94,7 +95,7 @@ fn main() {
             },
             block::BlockReceivedAction::ProcessMessage => { 
                 send_block_ack(sender, action_data, new_block_msgid);
-                process_message(sender, new_block_msgid);
+                process_message(sender, new_block_msgid, &bot_credentials);
             },
             
         }
@@ -122,7 +123,7 @@ fn send_command(sender: &mut user::User, command_type: command::CommandInt, payl
     sender.send_message(new_payload, true, needs_ack);
 }
 
-fn process_message(sender: &mut user::User, msg_id: u8) {
+fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<credential_manager::BridgeBotCredentials>) {
 
     let msg = sender.messages.get(&msg_id).expect("Failed to get message while processing");
 
@@ -139,7 +140,93 @@ fn process_message(sender: &mut user::User, msg_id: u8) {
                 }
             }
             command::CommandValue::DhkeValidate => {  }
-            command::CommandValue::AuthenticateNewAccount => {  }
+            command::CommandValue::AuthenticateToAccount => { 
+
+                // Find positions of username and password
+                let mut username_offset: usize = 0;
+                let mut username_offset_set: bool = false;
+                let mut password_offset: usize = 0;
+                let mut password_offset_set: bool = false;
+
+                let payload_bytes = actual_payload.into_vec();
+                for i in 0..payload_bytes.len() {
+                    if payload_bytes[i] == 0 {
+                        if username_offset_set {
+                            password_offset = i+1;
+                            password_offset_set = true;
+                        } else {
+                            username_offset = i+1;
+                            username_offset_set = true;
+                        }
+                    }
+                }
+
+                if !(username_offset_set && password_offset_set) {
+                    send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8, Lsb0>::from_vec("Insufficient data in request".as_bytes().to_vec()), false);
+                    return;
+                }
+
+                let service_name = match std::str::from_utf8(&payload_bytes[0..username_offset-1]) {
+                    Ok(v) => v.to_lowercase(),
+                    Err(_) => {
+                        send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8, Lsb0>::from_vec("Service name is not valid UTF-8".as_bytes().to_vec()), false);
+                        return;
+                    }
+                };
+                let username = match std::str::from_utf8(&payload_bytes[username_offset..password_offset-1]) {
+                    Ok(v) => v.to_lowercase(),
+                    Err(_) => {
+                        send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8, Lsb0>::from_vec("Username is not valid UTF-8".as_bytes().to_vec()), false);
+                        return;
+                    }
+                };
+                let password = &payload_bytes[password_offset..];
+
+                for botcred in bot_credentials {
+                    if service_name == botcred.service_name && username == botcred.username {
+                        let authentication_result = botcred.validate_credentials(&username, password);
+                        match authentication_result {
+                            Ok(v) => {
+                                if v == true {
+                                    let domain_idx = match sender.authenticate(botcred) {
+                                        Ok(v) => v,
+                                        Err(e) => {
+                                            if e == 0 {
+                                                send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Bot limit of 256 reached".as_bytes().to_vec()), false);
+                                            } else if e == 1 {
+                                                send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Already authenticated".as_bytes().to_vec()), false);
+
+                                            }
+                                            return;
+                                        }
+                                    };
+                                    
+                                    let mut payload: BitVec::<u8,Lsb0> = bitvec![u8, Lsb0; 0; 16];
+                                    payload[0..8].store::<u8>(1);
+                                    payload[8..16].store::<u8>(domain_idx);
+                                    send_command(sender, command::CommandValue::AuthenticationResult as command::CommandInt, &mut payload, false);
+                                } else {
+                                    let mut payload: BitVec::<u8, Lsb0> = bitvec![u8, Lsb0; 0; 8];
+                                    payload[0..8].store::<u8>(0);
+                                    send_command(sender, command::CommandValue::AuthenticationResult as command::CommandInt, &mut payload, false);
+                                }
+                            },
+                            Err(why) => { 
+                                send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(format!("Password verif failed: {}", why).as_bytes().to_vec()), false);
+                            }
+                        }
+                        return;
+                    }
+                }
+
+                // if loop finishes, it means the requested user was not found
+                let mut payload: BitVec::<u8, Lsb0> = bitvec![u8, Lsb0; 0; 8];
+                payload[0..8].store::<u8>(0);
+                let mut payload_secondhalf = BitVec::<u8, Lsb0>::from_vec("User not found".as_bytes().to_vec());
+                payload.append(&mut payload_secondhalf);
+                send_command(sender, command::CommandValue::AuthenticationResult as command::CommandInt, &mut payload, false);
+
+             }
             command::CommandValue::RequestKnownUsers => {  }
             command::CommandValue::BlockAck => { 
                 let block_ack_send_result = sender.process_block_ack(&actual_payload); 
@@ -147,13 +234,13 @@ fn process_message(sender: &mut user::User, msg_id: u8) {
                     Ok(()) => (),
                     Err(v) => {
                         if v == 1 {
-                            // missing block ack
+                            // Incoming ACK is missing the block id field
                             send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Missing block id".as_bytes().to_vec()), false);
                         }
                     }
                 }
             }
-            // todo: just send an invalid command message :3
+            // todo: just send an invalid command message, we have that command defined for a reason
             _ => { panic!("Unknown command sent"); }
         }
 

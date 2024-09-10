@@ -10,15 +10,18 @@ pub enum CommandValue {
     // cryptography
     DhkeInit = 1, // 1 of these each way...
     DhkeValidate = 2, // then 1 of these each way (likely with some known value (<4222.2209>))
-    Unencrypted = 3, // Used to respond to a message which requires encryption
+    Unencrypted = 3, // Reply when an instruction requiring encryption is received and the user has not yet established a secure connection
 
     // account related
-    AuthenticateNewAccount = 4, // authenticate matrix bridge for a new user@domain type account (e.g. linking a discord account / fb messenger account)
+    AuthenticateToAccount = 4, // authenticate matrix bridge for a new user@domain type account (e.g. linking a discord account / fb messenger account)
+    AuthenticationResult = 12, // Response to AuthenticateToAccount, contains NULL if unsuccessful, and 0x01 followed by the domain_idx if successful
     RequestKnownUsers = 7, // Request last N users on a given domain
+    RevokeAllClients = 13, // Revoke _all_ boost clients authentication with a given bot (requires authentication with the bot obv)
     
     // message related
-    DomainUnlinked = 5, // sender does not have the corrosponding domain linked (used as a response to DAT [ user@unlinked_domain payload ])
+    UnknownDomain = 5, // (used as a response to DAT [ user_idx@domain_idx payload ])
     TargetUserNotFound = 6,
+    
 
     // general
     Error = 8,
@@ -39,8 +42,8 @@ impl Command {
             if command_value == CommandValue::DhkeInit as CommandInt { CommandValue::DhkeInit }
             else if command_value == CommandValue::DhkeValidate as CommandInt { CommandValue::DhkeValidate }
             else if command_value == CommandValue::Unencrypted as CommandInt { CommandValue::Unencrypted }
-            else if command_value == CommandValue::AuthenticateNewAccount as CommandInt { CommandValue::AuthenticateNewAccount }
-            else if command_value == CommandValue::DomainUnlinked as CommandInt { CommandValue::DomainUnlinked }
+            else if command_value == CommandValue::AuthenticateToAccount as CommandInt { CommandValue::AuthenticateToAccount }
+            else if command_value == CommandValue::UnknownDomain as CommandInt { CommandValue::UnknownDomain }
             else if command_value == CommandValue::TargetUserNotFound as CommandInt { CommandValue::TargetUserNotFound }
             else if command_value == CommandValue::RequestKnownUsers as CommandInt { CommandValue::RequestKnownUsers }
             else if command_value == CommandValue::Error as CommandInt { CommandValue::Error }

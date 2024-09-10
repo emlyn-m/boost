@@ -6,13 +6,14 @@
 
 use std::fs;
 use regex::Regex;
+use bcrypt;
 
 const SUPPORTED_PLATFORMS: &'static [&'static str] = &["discord", "instagram", "fb_messenger"];
 
 pub struct BridgeBotCredentials {
-    bot_address: String, // address of the puppeting bot on our homeserver
-    service_name: String, // name of the external service, used to handle username conflicts
-    username: String,  // Specifically the username used for boost client -> boost server authentication, no relation to the platform username or bot address
+    pub bot_address: String, // address of the puppeting bot on our homeserver
+    pub service_name: String, // name of the external service, used to handle username conflicts between platforms
+    pub username: String,  // Specifically the username used for boost client -> boost server authentication, no relation to the platform username or bot address
     password: String, // See BridgeBotCredentials::username, note this is hashing using bcrypt with a cost of 12 (the default in the bcrypt crate)
 }
 
@@ -29,9 +30,16 @@ impl BridgeBotCredentials {
 
     }
 
-    pub fn validate_credentials() -> bool {
-        // todo: implement this - likely using bcrypt
-        return true;
+    pub fn validate_credentials(&self, username: &str, password: &[u8]) -> Result<bool, bcrypt::BcryptError> {
+        // technically double-checking as username is used to find the correct BridgeBotCredentials, but stil worth doing
+        if username != self.username {
+            return Ok(false);
+        }
+
+        match bcrypt::verify(password, &self.password) {
+            Ok(res) => return Ok(res),
+            Err(why) => return Err(why), 
+        };
     }
 }
 

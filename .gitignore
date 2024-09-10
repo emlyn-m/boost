@@ -1,3 +1,4 @@
-/target
-src/Cargo.lock
+server/target
+server/Cargo.lock
 sharedmem/
+server/credfile.cfg

@@ -19,19 +19,20 @@ COMMANDS = {
     "DATA_MODE": 0,
     "DhkeInit": 1,
     "DhkeValidate": 2,
-    "AuthenticateNewAccount": 4,
+    "AuthenticateToAccount": 4,
     "RequestKnownUsers": 7,
 }
 INCOMING_COMMANDS = {
     1: "DhkeInit",
     2: "DhkeValidate",
     3: "Unencrypted",
-    5: "DomainUnlinked",
+    5: "UnknownDomain",
     6: "Target user not found",
     8: "Error",
     9: "Invalid command",
     10: "Duplicate block",
-    11: "Block Ack"
+    11: "Block Ack",
+    12: "Auth Response"
 }
 
 
@@ -44,8 +45,8 @@ HELP_MSG = "\
 .loglevel [debug|prod]              Set the level used for logging\n\
 .ph [phone number]                  Switch the testing phone number\n\
 .init                               Setup a communication channel\n\
-.auth [user]@[domain] [password]    Authenticate a given user@domain account\n\
-.send [target@t_domain] [msg]       Send a message to target@t_domain\n\
+.auth [service name] [username] [password]    Authenticate a given account\n\
+.send [user_idx@bridgebot_idx] [msg]       Send a message to target@t_domain\n\
 "
 
 
@@ -68,6 +69,7 @@ class User:
             msg = bitstring.pack("bool, bool, bool, u5, hex", True, False, False, self.msg_id, payload)
 
         msg = msg.tobytes()
+        print(len(msg))
         with open(SHAREDMEM_SERVERIN_PATH + self.phNo, 'wb') as of:
             self.display(f"Sending message with id {self.msg_id} [bin {bin(int(msg.hex(), 16))}]", loglevel=0)
             of.write(msg)
@@ -91,7 +93,8 @@ class User:
                 if (self.commsEncrypted):
                     pass #todo: decrypt or whatever
                 
-                self.display(f"Server replied: hex[0x{serverMsg}]", loglevel=LOG_LEVELS["debug"])
+                self.display(f"Server replied: hex[0x{serverMsg.hex()}]", loglevel=LOG_LEVELS["debug"])
+                self.display(f"                bin[0b{bin(int(serverMsg.hex(), 16))[2:].zfill(len(serverMsg.hex()) * 4)}]", loglevel=LOG_LEVELS["debug"])
                 os.system(f"del {serverOutput.path.replace("/", "\\")}")
 
                 self.process(serverMsg)
@@ -120,8 +123,21 @@ class User:
 
             self.display(f"Server form of shared secret: {server_form}", loglevel=LOG_LEVELS['debug'])
 
+        if values[4] == 12:
+            # AuthResponse
+            # TODO: Special formatting for this
+
+
+            if values[5][4:6] == '01':
+                print("Authentication successful")
+                print(f"Set on domain {int(values[5][6:8], 16)}")
+            elif len(values[5]) == 4:
+                print("Incorrect password")
+
+
         else:
-            print(f"PAYLOAD: {values[5]}\n")
+            print(f"PAYLOAD: {values[5]}")
+            # print(f"DECODED: {bytes.fromhex(values[5]).decode('utf-8').replace('\x00', '')}\n")
         
         
 
@@ -154,8 +170,20 @@ class User:
 
             self.send_msg("DhkeInit", self.public)
 
+        elif target.startswith(".auth"):
+            self.send_command_authtoaccount(target[6:].split(" "))
+
         else:
             self.display("Unknown command", type="warn")
+
+
+    def send_command_authtoaccount(self, params):
+        print(f"Service: {params[0]}")
+        print(f"Username: {params[1]}")
+        print(f"Password: {params[2]}")
+
+        self.send_msg("AuthenticateToAccount", bytes(params[0], 'utf-8').hex() + "00" + bytes(params[1], 'utf-8').hex() + '00' + bytes(params[2], 'utf-8').hex())
+
 
 def main():
     print("\x1b[1mWelcome to Boost testing interface\x1b[0m\nUse ^C to enter input mode, and type .help for a list of available commands")

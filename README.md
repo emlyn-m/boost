@@ -18,10 +18,10 @@ Note that this is currently a very bad readme, and is bascially just a list of n
 
         Outline of the different parameters in a block:
             - bot-identifier: The value of this is completely ignored by the code, however it must have some value (i.e. bot-identifier != "") for structural reasons
-            - bot_address: The full matrix address of the relevant puppeting bot
+            - bot_address: The full matrix address of the relevant puppeting bot (case-insensitive)
             - service_name: The name of the service. This should be all lowercase, and one of the following supported values:
                 - TODO: Write list of supported platforms
-            - username: The username a user of the boost client uses to authenticate, no relation to the actual username on the platform
-            - password: See username, must be in the form of a bcrypt hash (compliant with the rust crate (bcrypt)[https://docs.rs/bcrypt/latest/bcrypt/]), and a cost value of 12
+            - username: The username a user of the boost client uses to authenticate, no relation to the actual username on the platform (case-insensitive)
+            - password: See username, case-sensitive, must be in the form of a bcrypt hash (compliant with the rust crate (bcrypt)[https://docs.rs/bcrypt/latest/bcrypt/]), and a cost value of 12
                 - TODO: Change the cost value if we decide to use a different one
 

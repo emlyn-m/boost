@@ -3,6 +3,7 @@ mod user;
 mod message;
 mod command;
 mod outgoing_message;
+mod credential_manager;
 
 use bitvec::prelude::*;
 use std::collections::HashMap;
@@ -10,6 +11,8 @@ use std::env;
 
 const SHAREDMEM_OUTPUT: &str = "../sharedmem/server_output";
 const SHAREDMEM_INPUT: &str = "../sharedmem/server_input/";
+
+const CREDFILE_PATH: &str = "credfile.cfg";
 
 // == DEBUG CODE - REPLACE WHEN HARDWARE DONE ==
 fn get_available_block() -> Option<block::Block> {
@@ -46,6 +49,12 @@ fn get_available_block() -> Option<block::Block> {
 fn main() {
 
     env::set_var("RUST_BACKTRACE", "1"); // set backtrace for debugging
+
+    // Load our bot credentials from our credential file
+    let bot_credentials = match credential_manager::load_credential_file(CREDFILE_PATH) {
+        Ok(creds) => creds,
+        Err(why) => panic!("Error loading the credential file: {}. Aborting!!", why),
+    };
 
     // todo: various setup
     let mut users: HashMap<String, user::User> = HashMap::new(); // (Phone no., User struct)

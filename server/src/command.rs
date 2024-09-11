@@ -16,7 +16,8 @@ pub enum CommandValue {
     AuthenticateToAccount = 4, // authenticate matrix bridge for a new user@domain type account (e.g. linking a discord account / fb messenger account)
     AuthenticationResult = 12, // Response to AuthenticateToAccount, contains NULL if unsuccessful, and 0x01 followed by the domain_idx if successful
     RequestKnownUsers = 7, // Request last N users on a given domain
-    RevokeAllClients = 13, // Revoke _all_ boost clients authentication with a given bot (requires authentication with the bot obv)
+    SignOut = 14, // Deauthenticate the sender from a given bot (send bot_idx)
+    RevokeAllClients = 13, // Revoke _all_ boost clients authentication with a given bot (requires authentication with the bot obv) (send bot address)
     
     // message related
     UnknownDomain = 5, // (used as a response to DAT [ user_idx@domain_idx payload ])

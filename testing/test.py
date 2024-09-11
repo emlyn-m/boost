@@ -64,9 +64,11 @@ class User:
 
     def send_msg(self, command, payload): # todo: make this support multipart messages
         self.msg_id+=1
-        msg = bitstring.pack("bool, bool, bool, u5, uint:8, hex", True, False, True, self.msg_id, COMMANDS[command], payload)
+        msg = None
         if command == 'DATA_MODE':
-            msg = bitstring.pack("bool, bool, bool, u5, hex", True, False, False, self.msg_id, payload)
+            msg = bitstring.pack("bool, bool, bool, u5, u16, u8, hex", True, False, False, self.msg_id, payload[0], payload[1], payload[2])
+        else:
+            msg = bitstring.pack("bool, bool, bool, u5, uint:8, hex", True, False, True, self.msg_id, COMMANDS[command], payload)
 
         msg = msg.tobytes()
         with open(SHAREDMEM_SERVERIN_PATH + self.phNo, 'wb') as of:
@@ -122,7 +124,7 @@ class User:
 
             self.display(f"Server form of shared secret: {server_form}", loglevel=LOG_LEVELS['debug'])
 
-        if values[4] == 12:
+        elif values[4] == 12:
             # AuthResponse
 
 
@@ -132,10 +134,17 @@ class User:
             elif len(values[5]) == 4:
                 print("Incorrect password")
 
+        elif values[4] == 9:
+            print("Invalid Command!!")
+            print(f"REASON: {bytes.fromhex(values[5], 'utf-8').decode('utf-8').replace('\x00', '')}")
+
 
         else:
             print(f"PAYLOAD: {values[5]}")
-            # print(f"DECODED: {bytes.fromhex(values[5]).decode('utf-8').replace('\x00', '')}\n")
+            try:
+                print(f"DECODED: {bytes.fromhex(values[5]).decode('utf-8').replace('\x00', '')}\n")
+            except Exception:
+                pass
         
         
 
@@ -171,13 +180,23 @@ class User:
         elif target.startswith(".auth"):
             self.send_command_authtoaccount(target[6:].split(" "))
 
+        elif target.startswith(".send"):
+            self.send_data(target[6:].split(" "))
+
         else:
             self.display("Unknown command", type="warn")
 
 
     def send_command_authtoaccount(self, params):
-
         self.send_msg("AuthenticateToAccount", bytes(params[0], 'utf-8').hex() + "00" + bytes(params[1], 'utf-8').hex() + '00' + bytes(params[2], 'utf-8').hex())
+
+    def send_data(self, params):
+
+        if len(params < 3):
+            params.append('')
+
+        self.send_msg("DATA_MODE", [int(params[0]), int(params[1]), bytes(params[2], 'utf-8').hex()])
+
 
 
 def main():

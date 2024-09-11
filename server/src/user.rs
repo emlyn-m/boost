@@ -47,7 +47,7 @@ impl User {
 
     pub fn decrypt_block(&self, block: &mut block::Block) {
         
-        let _chain_key = block.data.drain(0..8).collect::<BitVec>().load::<u8>(); // pull first octet (chain index)
+        // let _chain_key = block.data.drain(0..8).collect::<BitVec>().load::<u8>(); // pull first octet (chain index)
         
         // todo: actually decrypt the damn message
         
@@ -88,9 +88,10 @@ impl User {
     }
 
     pub fn send_message(&mut self, new_message: BitVec::<u8,Lsb0>, is_command: bool, outgoing: bool) {
-        let payload_size: usize = if self.is_encrypted { 139 } else { 140 };
+        let payload_size: usize = 140;
         
         let new_msg_id = self.unused_ids.pop().expect("No available id"); // todo: proper error handling
+        // fixme: We never reuse unused_ids when we send blocks which do not require a reply, e.g: sending a block ack in response
 
         
         // header size: 1 octet singlepart, 2 octets multipart
@@ -124,7 +125,7 @@ impl User {
         }
 
         if self.is_encrypted {
-            // todo: implement encryption over each entry in output_blocks (if encrypted, each block will only be 139 octets of header/payload)
+            // todo: implement encryption over each entry in output_blocks
         }
 
         if outgoing {
@@ -155,6 +156,7 @@ impl User {
         let shared_secret = server_secret.diffie_hellman(&other_public).to_bytes();
 
         self.shared_secret = shared_secret;
+        self.is_encrypted = true;
 
         return Ok(server_public.to_bytes());
 

@@ -245,12 +245,36 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
     } else {
         // data messages cannot be sent if the user is unencrypted
         if !sender.is_encrypted { 
+            dbg!("Send failed - no encryption");
             send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Messages cannot be sent before encryption is complete".as_bytes().to_vec()), false); 
             return;
         } 
 
-        // todo: check if user has an account on that domain
-        
+        // extract informaion about platform and user
+
+        let actual_payload = msg.payload.clone().into_vec();
+
+        if actual_payload.len() < 4 { // 4 bytes minimum: 2 for user index, 1 for platform idx, 1 for the minimum possible message
+            send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Malformed DAT payload".as_bytes().to_vec()), false);
+            return;
+        }
+
+        let user_idx: usize = actual_payload[0].try_into().expect("Conversion from u8 to usize failed???");
+        let platform_idx: usize = actual_payload[1].try_into().expect("Conversion from u8 to usize failed???");
+        if platform_idx >= sender.matrix_bots.len() {
+            send_command(sender, command::CommandValue::UnknownDomain as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false);
+            return;
+        }
+        if user_idx >= sender.matrix_bots[platform_idx].channels.len() {
+            send_command(sender, command::CommandValue::TargetUserNotFound as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false);
+            return;
+        }
+
+
+        sender.matrix_bots[platform_idx].send_to_channel(&user_idx, &actual_payload[2..]);
+
+        // todo: send some reply, but that's going to need async stuff and depends on how the matrix crate we use handles that
+        //      i should really set up a homeserver soon for testing        
         
     }
 }

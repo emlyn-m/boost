@@ -25,3 +25,6 @@ Note that this is currently a very bad readme, and is bascially just a list of n
             - password: See username, case-sensitive, must be in the form of a bcrypt hash (compliant with the rust crate (bcrypt)[https://docs.rs/bcrypt/latest/bcrypt/]), and a cost value of 12
                 - TODO: Change the cost value if we decide to use a different one
 
+
+- DATA Mode messages
+    - Payload structure: [user_idx: 16 bits][domain_idx: 8 bits][payload]

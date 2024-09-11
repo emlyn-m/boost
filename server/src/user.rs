@@ -133,8 +133,8 @@ impl User {
         }
 
         // DEBUG CODE BELOW - REPLACE WHEN HARDWARE AVAILABLE
-        let mut outfile = std::fs::File::create(crate::SHAREDMEM_OUTPUT.to_owned() + "/" + &self.address).expect("Failed to open sharedmem output");
         for i in 0..num_blocks as usize {
+            let mut outfile = std::fs::File::create(crate::SHAREDMEM_OUTPUT.to_owned() + "/" + &self.address + "-" + &new_msg_id.to_string() + "-" + &i.to_string()).expect("Failed to open sharedmem output");
             let _ = outfile.write(&(output_blocks[i].as_raw_slice()));
         }
 
@@ -201,6 +201,16 @@ impl User {
         self.matrix_bots.push(matrix_bot::MatrixBot::new(botcred.bot_address.clone(), botcred.service_name.clone()));
 
         return Ok((self.matrix_bots.len() - 1).try_into().unwrap()); // unwrap is ok here because we disallow insertions if length > 256
+    }
+
+    pub fn revoke_bot(&mut self, bot_index: usize) -> Result<(), ()> {
+        if bot_index >= self.matrix_bots.len() {
+            return Err(());
+        }
+
+        self.matrix_bots.remove(bot_index);
+
+        return Ok(());
     }
 
 }

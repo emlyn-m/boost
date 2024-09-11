@@ -42,10 +42,12 @@ impl Command {
         return {
             if command_value == CommandValue::DhkeInit as CommandInt { CommandValue::DhkeInit }
             else if command_value == CommandValue::DhkeValidate as CommandInt { CommandValue::DhkeValidate }
-            else if command_value == CommandValue::Unencrypted as CommandInt { CommandValue::Unencrypted }
+            // else if command_value == CommandValue::Unencrypted as CommandInt { CommandValue::Unencrypted }
             else if command_value == CommandValue::AuthenticateToAccount as CommandInt { CommandValue::AuthenticateToAccount }
-            else if command_value == CommandValue::UnknownDomain as CommandInt { CommandValue::UnknownDomain }
-            else if command_value == CommandValue::TargetUserNotFound as CommandInt { CommandValue::TargetUserNotFound }
+            else if command_value == CommandValue::SignOut as CommandInt { CommandValue::SignOut }
+            else if command_value == CommandValue::RevokeAllClients as CommandInt { CommandValue::RevokeAllClients } // for some reason this is flagged as unreachable
+            // else if command_value == CommandValue::UnknownDomain as CommandInt { CommandValue::UnknownDomain }
+            // else if command_value == CommandValue::TargetUserNotFound as CommandInt { CommandValue::TargetUserNotFound }
             else if command_value == CommandValue::RequestKnownUsers as CommandInt { CommandValue::RequestKnownUsers }
             else if command_value == CommandValue::Error as CommandInt { CommandValue::Error }
             else if command_value == CommandValue::BlockAck as CommandInt { CommandValue::BlockAck }

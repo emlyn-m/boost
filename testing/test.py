@@ -21,6 +21,7 @@ COMMANDS = {
     "DhkeValidate": 2,
     "AuthenticateToAccount": 4,
     "RequestKnownUsers": 7,
+    "SignOut": 14,
 }
 INCOMING_COMMANDS = {
     1: "DhkeInit",
@@ -136,7 +137,7 @@ class User:
 
         elif values[4] == 9:
             print("Invalid Command!!")
-            print(f"REASON: {bytes.fromhex(values[5], 'utf-8').decode('utf-8').replace('\x00', '')}")
+            print(f"REASON: {bytes.fromhex(values[5]).decode('utf-8').replace('\x00', '')}")
 
 
         else:
@@ -183,6 +184,9 @@ class User:
         elif target.startswith(".send"):
             self.send_data(target[6:].split(" "))
 
+        elif target.startswith(".signout"):
+            self.send_signout(target[9:])
+
         else:
             self.display("Unknown command", type="warn")
 
@@ -197,6 +201,8 @@ class User:
 
         self.send_msg("DATA_MODE", [int(params[0]), int(params[1]), bytes(params[2], 'utf-8').hex()])
 
+    def send_signout(self, idx):
+        self.send_msg("SignOut", hex(int(idx)))
 
 
 def main():

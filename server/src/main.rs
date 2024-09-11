@@ -237,6 +237,20 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                     }
                 }
             }
+            command::CommandValue::SignOut => {
+                // todo: this
+                let bot_index: usize = actual_payload[0].try_into().expect("u8 to usize conversion failed somehow");
+                dbg!(bot_index);
+                match sender.revoke_bot(bot_index) {
+                    Ok(()) => {},
+                    Err(()) => {
+                        send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false);
+                    }
+                };
+            }
+            command::CommandValue::RevokeAllClients => {
+
+            }
             command::CommandValue::RevokeAllClients => { }
             _ => { send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false); }
         }

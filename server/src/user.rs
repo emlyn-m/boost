@@ -190,9 +190,9 @@ impl User {
             return Err(0);
         }
 
-        for bot in &self.matrix_bots {
-            if bot.bot_address == botcred.bot_address {
-                return Err(1);
+        for i in 0..self.matrix_bots.len() {
+            if (&self.matrix_bots[i]).bot_address == botcred.bot_address {
+                return Ok(i.try_into().unwrap());
             }
         }
 

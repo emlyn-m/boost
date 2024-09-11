@@ -162,21 +162,21 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                 }
 
                 if !(username_offset_set && password_offset_set) {
-                    send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8, Lsb0>::from_vec("Insufficient data in request".as_bytes().to_vec()), false);
+                    send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8, Lsb0>::from_vec("Insufficient data in request".as_bytes().to_vec()), false);
                     return;
                 }
 
                 let service_name = match std::str::from_utf8(&payload_bytes[0..username_offset-1]) {
                     Ok(v) => v.to_lowercase(),
                     Err(_) => {
-                        send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8, Lsb0>::from_vec("Service name is not valid UTF-8".as_bytes().to_vec()), false);
+                        send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8, Lsb0>::from_vec("Service name is not valid UTF-8".as_bytes().to_vec()), false);
                         return;
                     }
                 };
                 let username = match std::str::from_utf8(&payload_bytes[username_offset..password_offset-1]) {
                     Ok(v) => v.to_lowercase(),
                     Err(_) => {
-                        send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8, Lsb0>::from_vec("Username is not valid UTF-8".as_bytes().to_vec()), false);
+                        send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8, Lsb0>::from_vec("Username is not valid UTF-8".as_bytes().to_vec()), false);
                         return;
                     }
                 };
@@ -193,9 +193,6 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                                         Err(e) => {
                                             if e == 0 {
                                                 send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Bot limit of 256 reached".as_bytes().to_vec()), false);
-                                            } else if e == 1 {
-                                                send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Already authenticated".as_bytes().to_vec()), false);
-
                                             }
                                             return;
                                         }
@@ -235,13 +232,13 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                     Err(v) => {
                         if v == 1 {
                             // Incoming ACK is missing the block id field
-                            send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Missing block id".as_bytes().to_vec()), false);
+                            send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Missing block id".as_bytes().to_vec()), false);
                         }
                     }
                 }
             }
-            // todo: just send an invalid command message, we have that command defined for a reason
-            _ => { panic!("Unknown command sent"); }
+            command::CommandValue::RevokeAllClients => { }
+            _ => { send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false); }
         }
 
 

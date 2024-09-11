@@ -69,7 +69,6 @@ class User:
             msg = bitstring.pack("bool, bool, bool, u5, hex", True, False, False, self.msg_id, payload)
 
         msg = msg.tobytes()
-        print(len(msg))
         with open(SHAREDMEM_SERVERIN_PATH + self.phNo, 'wb') as of:
             self.display(f"Sending message with id {self.msg_id} [bin {bin(int(msg.hex(), 16))}]", loglevel=0)
             of.write(msg)
@@ -125,7 +124,6 @@ class User:
 
         if values[4] == 12:
             # AuthResponse
-            # TODO: Special formatting for this
 
 
             if values[5][4:6] == '01':
@@ -178,9 +176,6 @@ class User:
 
 
     def send_command_authtoaccount(self, params):
-        print(f"Service: {params[0]}")
-        print(f"Username: {params[1]}")
-        print(f"Password: {params[2]}")
 
         self.send_msg("AuthenticateToAccount", bytes(params[0], 'utf-8').hex() + "00" + bytes(params[1], 'utf-8').hex() + '00' + bytes(params[2], 'utf-8').hex())
 

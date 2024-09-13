@@ -80,9 +80,9 @@ impl User {
         
 
         if self.messages.get(&msg_id).unwrap().is_complete {
-            return (block::BlockReceivedAction::ProcessMessage, 0);
+            (block::BlockReceivedAction::ProcessMessage, 0)
         } else {
-            return (block::BlockReceivedAction::SendBlockAck, block_idx);
+            (block::BlockReceivedAction::SendBlockAck, block_idx)
         }
                 
     }
@@ -92,10 +92,13 @@ impl User {
         
         let new_msg_id = self.unused_ids.pop().expect("No available id"); // todo: proper error handling
         // fixme: We never reuse unused_ids when we send blocks which do not require a reply, e.g: sending a block ack in response
+        if !outgoing {
+            self.unused_ids.push(new_msg_id);
+        }
 
         
         // header size: 1 octet singlepart, 2 octets multipart
-        let num_blocks = new_message.len().div_ceil(8 * (payload_size - 2)) as usize;
+        let num_blocks = new_message.len().div_ceil(8 * (payload_size - 2));
         let mut output_blocks = Vec::<BitVec::<u8,Lsb0>>::new();
 
         let header_size = if num_blocks == 1 { block::BLOCK_PAYLD_RANGE.start } else { block::BLOCK_MPPAY_RANGE.start };
@@ -133,7 +136,7 @@ impl User {
         }
 
         // DEBUG CODE BELOW - REPLACE WHEN HARDWARE AVAILABLE
-        for i in 0..num_blocks as usize {
+        for i in 0..num_blocks {
             let mut outfile = std::fs::File::create(crate::SHAREDMEM_OUTPUT.to_owned() + "/" + &self.address + "-" + &new_msg_id.to_string() + "-" + &i.to_string()).expect("Failed to open sharedmem output");
             let _ = outfile.write(&(output_blocks[i].as_raw_slice()));
         }
@@ -158,7 +161,7 @@ impl User {
         self.shared_secret = shared_secret;
         self.is_encrypted = true;
 
-        return Ok(server_public.to_bytes());
+        Ok(server_public.to_bytes())
 
 
     }
@@ -183,7 +186,7 @@ impl User {
         
 
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn authenticate(&mut self, botcred: &credential_manager::BridgeBotCredentials) -> Result<u8, u8> {
@@ -200,7 +203,7 @@ impl User {
 
         self.matrix_bots.push(matrix_bot::MatrixBot::new(botcred.bot_address.clone(), botcred.service_name.clone()));
 
-        return Ok((self.matrix_bots.len() - 1).try_into().unwrap()); // unwrap is ok here because we disallow insertions if length > 256
+        Ok((self.matrix_bots.len() - 1).try_into().unwrap()) // unwrap is ok here because we disallow insertions if length > 256
     }
 
     pub fn revoke_bot(&mut self, bot_index: usize) -> Result<(), ()> {
@@ -210,7 +213,7 @@ impl User {
 
         self.matrix_bots.remove(bot_index);
 
-        return Ok(());
+        Ok(())
     }
 
 }

@@ -39,7 +39,7 @@ impl Command {
     pub fn get_matching_command(payload: &BitVec::<u8,Lsb0>) -> CommandValue {
         let command_value: CommandInt = payload.get(0..COMMAND_BITLENGTH).unwrap().load::<CommandInt>();
         
-        return {
+        {
             if command_value == CommandValue::DhkeInit as CommandInt { CommandValue::DhkeInit }
             else if command_value == CommandValue::DhkeValidate as CommandInt { CommandValue::DhkeValidate }
             // else if command_value == CommandValue::Unencrypted as CommandInt { CommandValue::Unencrypted }
@@ -52,7 +52,7 @@ impl Command {
             else if command_value == CommandValue::Error as CommandInt { CommandValue::Error }
             else if command_value == CommandValue::BlockAck as CommandInt { CommandValue::BlockAck }
             else { panic!("Unknown command attempted") }
-        };
+        }
     }
 
 

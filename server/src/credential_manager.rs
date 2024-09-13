@@ -8,7 +8,7 @@ use std::fs;
 use regex::Regex;
 use bcrypt;
 
-const SUPPORTED_PLATFORMS: &'static [&'static str] = &["discord", "instagram", "fb_messenger"];
+const SUPPORTED_PLATFORMS: &[&str] = &["discord", "instagram", "fb_messenger"];
 
 pub struct BridgeBotCredentials {
     pub bot_address: String, // address of the puppeting bot on our homeserver

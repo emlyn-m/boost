@@ -238,7 +238,6 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                 }
             }
             command::CommandValue::SignOut => {
-                // todo: this
                 let bot_index: usize = actual_payload[0].try_into().expect("u8 to usize conversion failed somehow");
                 dbg!(bot_index);
                 match sender.revoke_bot(bot_index) {
@@ -249,9 +248,8 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                 };
             }
             command::CommandValue::RevokeAllClients => {
-
+                dbg!("Reveived revokeallclients");
             }
-            command::CommandValue::RevokeAllClients => { }
             _ => { send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false); }
         }
 
@@ -273,8 +271,8 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
             return;
         }
 
-        let user_idx: usize = actual_payload[0].try_into().expect("Conversion from u8 to usize failed???");
-        let platform_idx: usize = actual_payload[1].try_into().expect("Conversion from u8 to usize failed???");
+        let user_idx: usize = actual_payload[0].into();
+        let platform_idx: usize = actual_payload[1].into();
         if platform_idx >= sender.matrix_bots.len() {
             send_command(sender, command::CommandValue::UnknownDomain as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false);
             return;

@@ -24,7 +24,7 @@ pub struct Block {
 
 impl Block {
     pub fn new(addr: String, data: BitVec<u8, Lsb0>) -> Block {
-        return Block {
+        Block {
             addr,
             data,
         }
@@ -43,7 +43,7 @@ impl Block {
             return false; // too big - should never happen on real hardware (can remove in prod)
         }
 
-        return true
+        true
     }
 }
 

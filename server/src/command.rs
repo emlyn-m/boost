@@ -9,7 +9,7 @@ pub type CommandInt = u8;
 pub enum CommandValue {
     // cryptography
     DhkeInit = 1, // 1 of these each way...
-    DhkeValidate = 2, // then 1 of these each way (likely with some known value (<4222.2209>))
+    DhkeUpdate = 2, // Update chain key
     Unencrypted = 3, // Reply when an instruction requiring encryption is received and the user has not yet established a secure connection
 
     // account related
@@ -41,7 +41,7 @@ impl Command {
         
         {
             if command_value == CommandValue::DhkeInit as CommandInt { CommandValue::DhkeInit }
-            else if command_value == CommandValue::DhkeValidate as CommandInt { CommandValue::DhkeValidate }
+            else if command_value == CommandValue::DhkeUpdate as CommandInt { CommandValue::DhkeUpdate }
             // else if command_value == CommandValue::Unencrypted as CommandInt { CommandValue::Unencrypted }
             else if command_value == CommandValue::AuthenticateToAccount as CommandInt { CommandValue::AuthenticateToAccount }
             else if command_value == CommandValue::SignOut as CommandInt { CommandValue::SignOut }

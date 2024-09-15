@@ -133,13 +133,30 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
         let actual_payload = msg.payload.clone().split_off(8); // remove the command id from the message 
         match command_type {
             command::CommandValue::DhkeInit => { 
+                // revoke all of our authorizations on that sender
+                for i in 0..sender.matrix_bots.len() {
+                    let _ = sender.revoke_bot(i);
+                }
+
                 let shared_secret = sender.key_exchange(&actual_payload); 
                 match shared_secret {
                     Ok(val) => send_command(sender, command::CommandValue::DhkeInit as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(val.to_vec()), false),
-                    Err(e) => send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()), false)
-                }
+                    Err(e) => send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()), false),
+                };
             }
-            command::CommandValue::DhkeValidate => {  }
+            command::CommandValue::DhkeUpdate => { 
+                dbg!("DH Update");
+                if !sender.is_encrypted {
+                    send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("DH Update requires existing authentication".as_bytes().to_vec()), false);
+                    return;
+                }
+
+                let shared_secret = sender.key_exchange(&actual_payload);
+                match shared_secret {
+                    Ok(val) => send_command(sender, command::CommandValue::DhkeInit as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(val.to_vec()), false),
+                    Err(e) => send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()), false),
+                }
+             }
             command::CommandValue::AuthenticateToAccount => { 
 
                 // Find positions of username and password
@@ -249,6 +266,8 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
             }
             command::CommandValue::RevokeAllClients => {
                 dbg!("Reveived revokeallclients");
+
+                
             }
             _ => { send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false); }
         }

@@ -2,3 +2,4 @@ server/target
 server/Cargo.lock
 sharedmem/
 server/credfile.cfg
+testing/__pycache__

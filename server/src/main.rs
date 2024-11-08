@@ -117,7 +117,7 @@ fn send_block_ack(sender: &mut user::User, block_idx: u8, new_block_msgid: u8) {
 
 // Wrapper function to User.send_message for commands
 fn send_command(sender: &mut user::User, command_type: command::CommandInt, payload: &mut BitVec::<u8,Lsb0>, needs_ack: bool) {
-    let mut new_payload = bitvec![u8, Lsb0; 0; command::COMMAND_BITLENGTH + payload.len()];
+    let mut new_payload = bitvec![u8, Lsb0; 0; command::COMMAND_BITLENGTH];
     new_payload[0..command::COMMAND_BITLENGTH].store::<command::CommandInt>(command_type);
     new_payload.append(payload);
     sender.send_message(new_payload, true, needs_ack);
@@ -144,19 +144,19 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                     Err(e) => send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()), false),
                 };
             }
-            command::CommandValue::DhkeUpdate => { 
-                dbg!("DH Update");
-                if !sender.is_encrypted {
-                    send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("DH Update requires existing authentication".as_bytes().to_vec()), false);
-                    return;
-                }
+            // command::CommandValue::DhkeUpdate => { 
+            //     dbg!("DH Update");
+            //     if !sender.is_encrypted {
+            //         send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("DH Update requires existing authentication".as_bytes().to_vec()), false);
+            //         return;
+            //     }
 
-                let shared_secret = sender.key_exchange(&actual_payload);
-                match shared_secret {
-                    Ok(val) => send_command(sender, command::CommandValue::DhkeInit as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(val.to_vec()), false),
-                    Err(e) => send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()), false),
-                }
-             }
+            //     let shared_secret = sender.key_exchange(&actual_payload);
+            //     match shared_secret {
+            //         Ok(val) => send_command(sender, command::CommandValue::DhkeInit as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(val.to_vec()), false),
+            //         Err(e) => send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()), false),
+            //     }
+            //  }
             command::CommandValue::AuthenticateToAccount => { 
 
                 // Find positions of username and password
@@ -215,11 +215,14 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                                         }
                                     };
                                     
-                                    let mut payload: BitVec::<u8,Lsb0> = bitvec![u8, Lsb0; 0; 16];
+                                    let mut payload: BitVec::<u8,Lsb0> = bitvec![u8, Lsb0; 0; 24];
                                     payload[0..8].store::<u8>(1);
-                                    payload[8..16].store::<u8>(domain_idx);
+                                    payload[8..16].store::<u8>(msg_id);
+                                    payload[16..24].store::<u8>(domain_idx);
                                     send_command(sender, command::CommandValue::AuthenticationResult as command::CommandInt, &mut payload, false);
+                                    // successful authentication
                                 } else {
+                                    // fail due to incorrect username, should never happen
                                     let mut payload: BitVec::<u8, Lsb0> = bitvec![u8, Lsb0; 0; 8];
                                     payload[0..8].store::<u8>(0);
                                     send_command(sender, command::CommandValue::AuthenticationResult as command::CommandInt, &mut payload, false);

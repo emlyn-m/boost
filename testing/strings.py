@@ -27,7 +27,7 @@ HELP_MSG = "\x1b[1m\
 \x1b[38;5;132m--------------------------------------------\x1b[0m\x1b[1m\n\
 \x1b[38;5;141m.logout [domain index]\x1b[0m                        Sign out of platform [domain index]\n\
 \x1b[38;5;132m--------------------------------------------\x1b[0m\x1b[1m\n\
-\x1b[38;5;141m.revokeall\x1b[0m                                    Sign out of platform [domain index] on all clients\n\
+\x1b[38;5;141m.revokeall [domain index]\x1b[0m                     Sign out of platform [domain index] on all clients\n\
 "
 
 PH_INPUT = "\x1b[38;5;141mPhone number: \x1b[0m"

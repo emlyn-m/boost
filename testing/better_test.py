@@ -79,6 +79,7 @@ class Sender:
         
         msg = msg.tobytes()
         msg_path = SHAREDMEM_INPUT + f"/{str(self.phone_number) + "-" + str(int(random.random() * 1000))}"
+        msg_path = SHAREDMEM_INPUT + f"/{str(self.phone_number)}"
         self.cli.display(f"Message file path: {os.path.abspath(msg_path)}", lvl="debug")
         with open(msg_path, "wb") as of:
             self.cli.display(f"Sending id[{self.msg_id}] bin[{bin(int(msg.hex(), 16))}]", lvl="debug")
@@ -163,7 +164,8 @@ class Cli:
         elif Message.COMMANDS_REVERSE[command_type] == "AuthResult":
             status_res = int(payload[:2], 16)
             if status_res != 1:
-                self.display("Error: Authentication failed (first byte of message not 0x01)", lvl="prod")
+                self.display("Error: Authentication failed", lvl="prod")
+                return
 
             msg_responding_to = int(payload[2:4], 16)
             domain_idx = int(payload[4:6], 16)
@@ -304,7 +306,16 @@ class CommandHandler:
         cli.display("Unimplented", lvl="warn")
 
     def handle_logout(cli, com):
-        cli.display("Error: Unimplemented", lvl="err")
+        domain_idx = com.split(' ')[1]
+        try:
+            domain_idx = int(domain_idx)
+            assert(cli.agent.domains[domain_idx] != None)
+        except (ValueError, AssertionError):
+            cli.display("Invalid domain", lvl="err")
+            return
+
+        cli.agent.send_msg("SignOut", hex(domain_idx)[2:])
+        
 
     def handle_revoke_all_clients(cli, com):
         cli.display("Error: Unimplemented", lvl="err")
@@ -322,8 +333,9 @@ CommandHandler.COMMAND_PREFIX_FUNCS = {
     ".lsdomains": CommandHandler.handle_lsdomains,
     ".lsusers": CommandHandler.handle_lsusers,
     ".reqdomains": CommandHandler.handle_reqdomains,
-    ".requsers": CommandHandler.handle_requsers
-
+    ".requsers": CommandHandler.handle_requsers,
+    ".logout": CommandHandler.handle_logout,
+    ".revokeall": CommandHandler.handle_revoke_all_clients,
 }
 
 

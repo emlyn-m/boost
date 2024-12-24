@@ -1,5 +1,8 @@
 server/target
 server/Cargo.lock
 sharedmem/
-server/credfile.cfg
 testing/__pycache__
+
+
+server/credfile.cfg
+server/homeserver_creds.cfg

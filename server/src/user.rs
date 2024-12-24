@@ -91,7 +91,6 @@ impl User {
         let payload_size: usize = 140;
         
         let new_msg_id = self.unused_ids.pop().expect("No available id"); // todo: proper error handling
-        // fixme: We never reuse unused_ids when we send blocks which do not require a reply, e.g: sending a block ack in response
         if !outgoing {
             self.unused_ids.push(new_msg_id);
         }
@@ -201,7 +200,7 @@ impl User {
             }
         }
 
-        self.matrix_bots.push(matrix_bot::MatrixBot::new(botcred.bot_address.clone(), botcred.service_name.clone()));
+        // todo: rearchitect this to be a pub-sub model
 
         Ok((self.matrix_bots.len() - 1).try_into().unwrap()) // unwrap is ok here because we disallow insertions if length > 256
     }

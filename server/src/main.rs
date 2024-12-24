@@ -5,15 +5,20 @@ mod command;
 mod outgoing_message;
 mod credential_manager;
 mod matrix_bot;
+mod matrix_message;
 
 use bitvec::prelude::*;
 use std::collections::HashMap;
 use std::env;
+use std::sync::mpsc;
+use std::sync::mpsc::{Sender, Receiver};
+
 
 const SHAREDMEM_OUTPUT: &str = "../sharedmem/server_output";
 const SHAREDMEM_INPUT: &str = "../sharedmem/server_input/";
 
 const CREDFILE_PATH: &str = "credfile.cfg";
+const HOMESERVER_CREDFILE_PATH: &str = "homeserver_creds.cfg";
 
 // == DEBUG CODE - REPLACE WHEN HARDWARE DONE ==
 fn get_available_block() -> Option<block::Block> {
@@ -56,6 +61,19 @@ fn main() {
         Ok(creds) => creds,
         Err(why) => panic!("Error loading the credential file: {}. Aborting!!", why),
     };
+
+
+    // todo: authenticate to matrix homeserver, setup threads for bridge bots
+    let homeserver_creds = match credential_manager::load_homeserver_creds(HOMESERVER_CREDFILE_PATH) {
+        Ok(creds) => creds,
+        Err(why) => panic!("Error loading homeserver credfile: {}. Aborting!!", why),
+    };
+    dbg!(homeserver_creds.address);
+    dbg!(homeserver_creds.username);
+    dbg!(homeserver_creds.password);
+
+    let appservices: Vec::<Sender<matrix_message::MatrixMessage>> = vec![];
+    // for 
 
     // todo: various setup
     let mut users: HashMap<String, user::User> = HashMap::new(); // (Phone no., User struct)
@@ -215,12 +233,12 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                                         }
                                     };
                                     
+                                    // successful authentication
                                     let mut payload: BitVec::<u8,Lsb0> = bitvec![u8, Lsb0; 0; 24];
                                     payload[0..8].store::<u8>(1);
                                     payload[8..16].store::<u8>(msg_id);
                                     payload[16..24].store::<u8>(domain_idx);
                                     send_command(sender, command::CommandValue::AuthenticationResult as command::CommandInt, &mut payload, false);
-                                    // successful authentication
                                 } else {
                                     // fail due to incorrect username, should never happen
                                     let mut payload: BitVec::<u8, Lsb0> = bitvec![u8, Lsb0; 0; 8];
@@ -244,7 +262,8 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                 send_command(sender, command::CommandValue::AuthenticationResult as command::CommandInt, &mut payload, false);
 
              }
-            command::CommandValue::RequestKnownUsers => {  }
+            command::CommandValue::RequestKnownUsers => {  } // todo: this
+            command::CommandValue::RequestDomains => {  }
             command::CommandValue::BlockAck => { 
                 let block_ack_send_result = sender.process_block_ack(&actual_payload); 
                 match block_ack_send_result {
@@ -259,7 +278,6 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
             }
             command::CommandValue::SignOut => {
                 let bot_index: usize = actual_payload[0].try_into().expect("u8 to usize conversion failed somehow");
-                dbg!(bot_index);
                 match sender.revoke_bot(bot_index) {
                     Ok(()) => {},
                     Err(()) => {
@@ -305,7 +323,8 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
         }
 
 
-        sender.matrix_bots[platform_idx].send_to_channel(&user_idx, &actual_payload[2..]);
+        // sender.matrix_bots[platform_idx].send_to_channel(&user_idx, &actual_payload[2..]);
+        // todo: mpsc so we can just give every user a clone of the tx channel
 
         // todo: send some reply, but that's going to need async stuff and depends on how the matrix crate we use handles that
         //      i should really set up a homeserver soon for testing        

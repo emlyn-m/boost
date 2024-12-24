@@ -10,6 +10,58 @@ use bcrypt;
 
 const SUPPORTED_PLATFORMS: &[&str] = &["discord", "instagram", "fb_messenger"];
 
+pub struct HomeserverCredentials {
+    pub address: String,
+    pub username: String,
+    pub password: String,
+}
+
+pub fn load_homeserver_creds(credfile_path: &'static str) -> Result<HomeserverCredentials, String> {
+    // todo: add some point support multiple homeservers
+    let contents = match fs::read_to_string(credfile_path) {
+        Ok(contents) => contents,
+        Err(_) => return Err("Unable to open credential file".to_string())
+    };
+
+    let credline_seperate_re = Regex::new("[\r\n]+").unwrap();
+    let header_line_re = Regex::new("\\[.+\\]").unwrap();
+    let kv_split_re = Regex::new("=").unwrap();
+
+    let mut url = "";
+    let mut username = "";
+    let mut password = "";
+
+    let lines = credline_seperate_re.split(&contents);
+    for line in lines {
+        if line.trim().is_empty() || header_line_re.is_match(line) {
+            continue;
+        }
+
+        let credpair_kv: Vec::<_> = kv_split_re.split(line.trim()).collect();
+        if credpair_kv.len() != 2 {
+            return Err(format!("Invalid line in credential file: \"{}\"", line));
+        }
+
+        let cred_key = credpair_kv[0];
+        let cred_value = credpair_kv[1];
+
+        match cred_key {
+            "url" => url = cred_value,
+            "username" => username = cred_value,
+            "password" => password = cred_value,
+            &_ => panic!("Unknown line in credfile: {}", cred_key)
+        };
+    }
+
+    Ok(HomeserverCredentials {
+        address: url.to_string(),
+        username: username.to_string(),
+        password: password.to_string()
+    })
+
+}
+
+
 pub struct BridgeBotCredentials {
     pub bot_address: String, // address of the puppeting bot on our homeserver
     pub service_name: String, // name of the external service, used to handle username conflicts between platforms

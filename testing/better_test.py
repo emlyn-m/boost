@@ -70,8 +70,8 @@ class Sender:
         self.msg_id = (self.msg_id + 1) % 32
 
         msg = None
-        if command == Message.COMMANDS["DAT"]:
-            msg = bitstring.pack(Message.MSG_PATTERN_DAT, True, False, False, self.msg_id, payload[0], payload[1], payload[2])
+        if command == "DAT":
+            msg = bitstring.pack(Message.MSG_PATTERN_DAT, True, False, False, self.msg_id, payload[0], payload[1], payload[2]) # user_idx THEN platform_idx
         else:
             msg = bitstring.pack(Message.MSG_PATTERN_COM, True, False, True, self.msg_id, Message.COMMANDS[command], payload)
 
@@ -83,6 +83,12 @@ class Sender:
         with open(msg_path, "wb") as of:
             self.cli.display(f"Sending id[{self.msg_id}] bin[{bin(int(msg.hex(), 16))}]", lvl="debug")
             of.write(msg)
+
+    def encrypt_msg(self, msg_str):
+        return msg_str
+
+    def decrypt_msg(self, msg_str):
+        return msg_str
 
 class Cli:
 
@@ -244,7 +250,7 @@ class CommandHandler:
 
     def handle_init(cli, _com):
 
-        cli.agent.enc_secret = secrets.token_bytes(32)  # INFO: This is ~NOT~ secure!! Use a proper library
+        cli.agent.enc_secret = secrets.token_bytes(32)
         print("client public: ")
         cli.agent.send_msg("DhkeInit", x25519.scalar_base_mult(cli.agent.enc_secret).hex())
 
@@ -266,7 +272,18 @@ class CommandHandler:
         cli.agent.send_msg("AuthToAcc", service_name + "00" + username + "00" + password)
 
     def handle_send(cli, com):
-        cli.display("Unimplented", lvl="warn")
+        # Useridx@platformidx payload
+
+        if len(com.split(" ")) < 3 or len(com.split(" ")[1].split("@")) != 2:
+            cli.display("Invalid format (user_idx@domain_idx message)", lvl="err")
+            return
+
+        user_idx = com.split(" ")[1].split("@")[0]
+        platform_idx = com.split(" ")[1].split("@")[1]
+        payload_str = " ".join(com.split(" ")[2:])
+        payload = payload_str.encode('utf-8').hex()
+
+        cli.agent.send_msg("DAT", [user_idx, platform_idx, payload])
 
     def handle_lsdomains(cli, _com):
         if len(set(cli.agent.domains)) > 1:

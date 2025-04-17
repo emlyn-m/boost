@@ -107,8 +107,10 @@ impl MatrixBot {
 
         loop {
             // poll for command channel messages
-            for latest_control_msg in self.internal_channels.3.try_iter() {
-                // we have a control message to deal with
+            let latest_control_msg = self.internal_channels.3.try_recv();
+            // we have a control message to deal with
+            if latest_control_msg.is_ok() {
+                let latest_control_msg = latest_control_msg.expect("Failed to unwrap an OK value (control_msg)");
                 match latest_control_msg {
                     MatrixBotControlMessage::RequestChannels => {
                         let mut idx = 0;
@@ -125,15 +127,21 @@ impl MatrixBot {
                     _ => {  }  // unimplemented
                 }
             }
+            
 
-            for latest_msg in self.internal_channels.1.try_iter() {
-                // todo: poll normal rx channel for matrix_message type (means we have to send that message out)
+            let latest_msg = self.internal_channels.1.try_recv();
+            if latest_msg.is_ok() {
+                let latest_msg = latest_msg.expect("Failed to unwrap an OK value (matrix_msg)");
+                let target_channel = &self.channels[latest_msg.room_idx];
+                let outgoing_payload = ruma::events::room::message::RoomMessageEventContent::text_plain(&latest_msg.content);
+                target_channel.room.send(outgoing_payload).await;
+                println!("Sending message {} to {} on platform {}", &latest_msg.content, &target_channel.display_name, &self.platform);
             }
-
-            // lastly, we need some way to check for matrix messages that we need to send out via sms
         }
 
+        // lastly, we need some way to check for matrix messages that we need to send out via sms
     }
+
 }
 
 

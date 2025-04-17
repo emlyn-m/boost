@@ -315,9 +315,9 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
 
         // extract informaion about platform and user
 
-        let actual_payload = msg.payload.clone().into_vec();
+        let mut actual_payload = msg.payload.clone().into_vec();
 
-        if actual_payload.len() < 4 { // 4 bytes minimum: 2 for user index, 1 for platform idx, 1 for the minimum possible message
+        if actual_payload.len() < 3 { // 4 bytes minimum: 2 for user index, 1 for platform idx, 1 for the minimum possible message
             send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Malformed DAT payload".as_bytes().to_vec()), false);
             return;
         }
@@ -333,12 +333,24 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
             return;
         }
 
+        let msg_content_bytes = actual_payload.drain(2..).collect();
+        let msg_content_str = match String::from_utf8(msg_content_bytes) {
+            Ok(content) => content,
+            Err(e) => {
+                send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Malformed UTF-8 Data".as_bytes().to_vec()), false);
+                return;
+            }
+        };
 
-        // sender.matrix_bots[platform_idx].send_to_channel(&user_idx, &actual_payload[2..]);
-        // todo: mpsc so we can just give every user a clone of the tx channel
+
+        sender.matrix_bot_channels[platform_idx].0.send(matrix_message::MatrixMessage {
+            room_idx: user_idx,
+            content: msg_content_str,
+        });
 
         // todo: send some reply, but that's going to need async stuff and depends on how the matrix crate we use handles that
         //      i should really set up a homeserver soon for testing     YIPPEE I HAVE A HOMESERVER    
+        // we can send a reply by a blocking call to the control channel, waiting for a MatrixControlMessage::MsgSendStatus which contains a result and evaluating that
         
     }
 

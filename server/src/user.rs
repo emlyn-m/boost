@@ -225,14 +225,6 @@ impl User {
             }
         }
 
-        // for future ref, this is needed bc the matrix->this code channel (rx side) has to be stored in main to call out to other funcs (namely send via sms?)
-        // send via sms done in user obj, cant we just create the channels right here??
-
-        // matrix -> sms [ WORKS IF WE DO IT HERE ]
-        // sms -> matrix [ ALSO WORKS IF WE DO IT HERE ]
-
-        // ok yea just create channels here
-
         // todo: figure out how we actually get sms messages from this
             // likely frequent polling at same point as polling for sms
 
@@ -300,7 +292,7 @@ impl User {
         }
 
         self.matrix_bots.remove(bot_index);
-        // also remove channels and kill thread
+        //todo:  also remove channels and kill thread
 
         Ok(())
     }

@@ -1,12 +1,11 @@
 import strings
 import random
+import secrets
 import time
-import bitstring
-
-bitstring.lsb0 = False
-
+import x25519
 import os
-
+import bitstring
+bitstring.lsb0 = False
 
 SHAREDMEM_INPUT = "../sharedmem/server_input/"
 SHAREDMEM_OUTPUT = "../sharedmem/server_output/"
@@ -158,8 +157,10 @@ class Cli:
 
 
         if command_type == Message.COMMANDS["DhkeInit"]:
-            server_pk = data_vals[5][::-1][:64][::-1]
-            # todo: finish this off
+            server_public = bytes.fromhex(data_vals[5][::-1][:64][::-1])
+            self.agent.enc_key = x25519.scalar_mult(self.agent.enc_secret, server_public)
+            print(self.agent.enc_key.hex())
+            
 
         elif Message.COMMANDS_REVERSE[command_type] == "AuthResult":
             status_res = int(payload[:2], 16)
@@ -243,8 +244,9 @@ class CommandHandler:
 
     def handle_init(cli, _com):
 
-        cli.agent.enc_secret = hex(random.getrandbits(256))[2:]  # INFO: This is ~NOT~ secure!! Use a proper library
-        cli.agent.send_msg("DhkeInit", cli.agent.enc_secret)
+        cli.agent.enc_secret = secrets.token_bytes(32)  # INFO: This is ~NOT~ secure!! Use a proper library
+        print("client public: ")
+        cli.agent.send_msg("DhkeInit", x25519.scalar_base_mult(cli.agent.enc_secret).hex())
 
 
     def handle_auth(cli, com):

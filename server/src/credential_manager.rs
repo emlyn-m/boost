@@ -67,17 +67,22 @@ pub struct BridgeBotCredentials {
     pub service_name: String, // name of the external service, used to handle username conflicts between platforms
     pub username: String,  // Specifically the username used for boost client -> boost server authentication, no relation to the platform username or bot address
     password: String, // See BridgeBotCredentials::username, note this is hashing using bcrypt with a cost of 12 (the default in the bcrypt crate)
+
+    pub dm_room_id: String,
+    pub admin_room_id: String,
 }
 
 impl BridgeBotCredentials {
 
-    pub fn new(bot_address: String, service_name: String, username: String, password: String) -> BridgeBotCredentials {
+    pub fn new(bot_address: String, service_name: String, username: String, password: String, dm_room_id: String, admin_room_id: String) -> BridgeBotCredentials {
 
         BridgeBotCredentials{
             bot_address,
             service_name,
             username,
             password,
+            dm_room_id,
+            admin_room_id,
         }
 
     }
@@ -132,6 +137,8 @@ pub fn load_credential_file(credfile_path: &'static str) -> Result<Vec::<BridgeB
         let mut ccred_service_name: String = "".to_string();
         let mut ccred_username: String = "".to_string();
         let mut ccred_password: String = "".to_string();
+        let mut ccred_dm_space_id: String = "".to_string();
+        let mut ccred_admin_room_id: String = "".to_string();
 
 
         for credpair in credential_pairs {
@@ -162,6 +169,8 @@ pub fn load_credential_file(credfile_path: &'static str) -> Result<Vec::<BridgeB
                 }
                 "username" => set_credential(&mut ccred_username, cred_key, cred_value.to_lowercase())?,
                 "password" => set_credential(&mut ccred_password, cred_key, cred_value.to_string())?,
+                "dm_space_id" => set_credential(&mut ccred_dm_space_id, cred_key, cred_value.to_string())?,
+                "admin_room_id" => set_credential(&mut ccred_admin_room_id, cred_key, cred_value.to_string())?,
 
                 _ => return Err(format!("Unknown key \"{}\" in credential file", cred_key)),
             };
@@ -175,8 +184,8 @@ pub fn load_credential_file(credfile_path: &'static str) -> Result<Vec::<BridgeB
             }
         } 
 
-        if ccred_bot_address != "" && ccred_service_name != "" && ccred_username != "" && ccred_password != "" {
-            current_credentials.push(BridgeBotCredentials::new(ccred_bot_address, ccred_service_name, ccred_username, ccred_password));
+        if ccred_bot_address != "" && ccred_service_name != "" && ccred_username != "" && ccred_password != "" && ccred_dm_space_id != "" && ccred_admin_room_id != "" {
+            current_credentials.push(BridgeBotCredentials::new(ccred_bot_address, ccred_service_name, ccred_username, ccred_password, ccred_dm_space_id, ccred_admin_room_id));
         } else {
             return Err("Missing values for a bot's credentials".to_string());
         }

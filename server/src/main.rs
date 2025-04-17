@@ -12,6 +12,9 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender, Receiver};
+use std::sync::Arc;
+
+use matrix_sdk;
 
 
 const SHAREDMEM_OUTPUT: &str = "../sharedmem/server_output";
@@ -51,8 +54,8 @@ fn get_available_block() -> Option<block::Block> {
     None
 }
 
-
-fn main() {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
 
     env::set_var("RUST_BACKTRACE", "1"); // set backtrace for debugging
 
@@ -63,17 +66,23 @@ fn main() {
     };
 
 
-    // todo: authenticate to matrix homeserver, setup threads for bridge bots
+    // authenticate to matrix homeserver
     let homeserver_creds = match credential_manager::load_homeserver_creds(HOMESERVER_CREDFILE_PATH) {
         Ok(creds) => creds,
         Err(why) => panic!("Error loading homeserver credfile: {}. Aborting!!", why),
     };
-    dbg!(homeserver_creds.address);
-    dbg!(homeserver_creds.username);
-    dbg!(homeserver_creds.password);
+    let user_id = matrix_sdk::ruma::UserId::parse(&homeserver_creds.username).expect("Failed to create user id from credfile username");
+    let client = Arc::new(
+        matrix_sdk::Client::builder()
+            .homeserver_url(&homeserver_creds.address)
+            .build()
+            .await?
+    );
+    client.matrix_auth().login_username(&homeserver_creds.username, &homeserver_creds.password).send().await?;
+    client.sync_once(matrix_sdk::config::SyncSettings::default()).await?;
 
-    let appservices: Vec::<Sender<matrix_message::MatrixMessage>> = vec![];
-    // for 
+    // todo: setup threads for bridge bots?
+    let appservices: Vec::<Sender<matrix_message::MatrixMessage>> = vec![]; // this is sender of matrix_msg so it is how we send messages from sms to matrix
 
     // todo: various setup
     let mut users: HashMap<String, user::User> = HashMap::new(); // (Phone no., User struct)
@@ -88,7 +97,7 @@ fn main() {
         let sender_addr = new_block.addr.clone();
 
         if !users.contains_key(&sender_addr) {
-            users.insert(sender_addr.clone(), user::User::new(sender_addr.clone(), false));
+            users.insert(sender_addr.clone(), user::User::new(client.clone(), sender_addr.clone(), false));
         }
 
         let sender = users.get_mut(&sender_addr).unwrap(); // sender is a &mut
@@ -122,6 +131,8 @@ fn main() {
 
 
     }
+
+    Ok(())
 
 }
 
@@ -317,7 +328,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
             send_command(sender, command::CommandValue::UnknownDomain as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false);
             return;
         }
-        if user_idx >= sender.matrix_bots[platform_idx].channels.len() {
+        if user_idx >= sender.matrix_bots[platform_idx].num_channels {
             send_command(sender, command::CommandValue::TargetUserNotFound as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false);
             return;
         }
@@ -327,7 +338,8 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
         // todo: mpsc so we can just give every user a clone of the tx channel
 
         // todo: send some reply, but that's going to need async stuff and depends on how the matrix crate we use handles that
-        //      i should really set up a homeserver soon for testing        
+        //      i should really set up a homeserver soon for testing     YIPPEE I HAVE A HOMESERVER    
         
     }
+
 }

@@ -2,13 +2,23 @@ use crate::block;
 use crate::message;
 use crate::outgoing_message;
 use crate::matrix_bot;
+use crate::matrix_bot::MatrixBotChannels;
 use crate::credential_manager;
+use crate::matrix_message::{
+    MatrixMessage, MatrixBotControlMessage
+};
 
 use bitvec::prelude::*;
 use x25519_dalek;
+use matrix_sdk::Client;
+use futures::executor;
 
 use std::collections::HashMap;
 use std::io::Write; 
+use std::sync::mpsc;
+use std::sync::mpsc::{Sender, Receiver};
+use std::sync::Arc;
+
 
 pub struct User {
     pub address: String,
@@ -21,12 +31,15 @@ pub struct User {
     // todo: encryption parameters
     pub shared_secret: [u8; 32],
 
-    pub matrix_bots: Vec::<matrix_bot::MatrixBot>,
+    pub client: Arc<Client>,
+
+    pub matrix_bots: Vec::<matrix_bot::MatrixBotInfo>,
+    pub matrix_bot_channels: Vec::<MatrixBotChannels>,
 }
 
 impl User {
 
-    pub fn new(addr: String, is_enc: bool) -> User {
+    pub fn new(client: Arc<Client>, addr: String, is_enc: bool) -> User {
         let mut new_user = User {
             address: addr,
             is_encrypted: is_enc,
@@ -34,7 +47,9 @@ impl User {
             messages: HashMap::new(), // hashmap over <msgId, Message>
             unused_ids: vec![],
             shared_secret: [0; 32],
+            client,
             matrix_bots: vec![],
+            matrix_bot_channels: vec![],
         };
 
         for i in 1<<4..1<<5 {
@@ -53,6 +68,7 @@ impl User {
         
     }
 
+    // receive block through sms
     pub fn receive_block(&mut self, new_block: &mut block::Block) -> (block::BlockReceivedAction, u8) { // return s and action and (in all instances - the block index)
 
         let msg_id = new_block.data.get(block::BLOCK_MSGID_RANGE).unwrap().load::<u8>();
@@ -87,6 +103,7 @@ impl User {
                 
     }
 
+    // send full message through sms
     pub fn send_message(&mut self, new_message: BitVec::<u8,Lsb0>, is_command: bool, outgoing: bool) {
         let payload_size: usize = 140;
         
@@ -136,7 +153,15 @@ impl User {
 
         // DEBUG CODE BELOW - REPLACE WHEN HARDWARE AVAILABLE
         for i in 0..num_blocks {
-            let mut outfile = std::fs::File::create(crate::SHAREDMEM_OUTPUT.to_owned() + "/" + &self.address + "-" + &new_msg_id.to_string() + "-" + &i.to_string()).expect("Failed to open sharedmem output");
+            let mut outfile_path: String = "".to_string();
+            outfile_path += crate::SHAREDMEM_OUTPUT;
+            outfile_path += "/";
+            outfile_path += self.address.as_str();
+            outfile_path += "-";
+            outfile_path += new_msg_id.to_string().as_str();
+            outfile_path += "-";
+            outfile_path += i.to_string().as_str();
+            let mut outfile = std::fs::File::create(outfile_path).expect("Failed to open sharedmem output");
             let _ = outfile.write(&(output_blocks[i].as_raw_slice()));
         }
 
@@ -200,9 +225,73 @@ impl User {
             }
         }
 
-        // todo: rearchitect this to be a pub-sub model
+        // for future ref, this is needed bc the matrix->this code channel (rx side) has to be stored in main to call out to other funcs (namely send via sms?)
+        // send via sms done in user obj, cant we just create the channels right here??
 
-        Ok((self.matrix_bots.len() - 1).try_into().unwrap()) // unwrap is ok here because we disallow insertions if length > 256
+        // matrix -> sms [ WORKS IF WE DO IT HERE ]
+        // sms -> matrix [ ALSO WORKS IF WE DO IT HERE ]
+
+        // ok yea just create channels here
+
+        // todo: figure out how we actually get sms messages from this
+            // likely frequent polling at same point as polling for sms
+
+        // we need a bidirectional channel interface, so two channels just for data
+        let (here_tx, mbot_rx): (Sender::<MatrixMessage>, Receiver::<MatrixMessage>) = mpsc::channel();
+        let (mbot_tx, here_rx): (Sender::<MatrixMessage>, Receiver::<MatrixMessage>) = mpsc::channel();
+        let (here_control_tx, mbot_control_rx): (Sender::<MatrixBotControlMessage>, Receiver::<MatrixBotControlMessage>) = mpsc::channel();
+        let (mbot_control_tx, here_control_rx): (Sender::<MatrixBotControlMessage>, Receiver::<MatrixBotControlMessage>) = mpsc::channel();
+
+        let mut new_bot = matrix_bot::MatrixBot::new(
+            self.client.clone(),
+            botcred.bot_address.clone(),
+            botcred.service_name.clone(),
+            botcred.dm_room_id.clone(),
+            botcred.admin_room_id.clone(),
+            MatrixBotChannels(
+                mbot_tx, mbot_rx, mbot_control_tx, mbot_control_rx
+            ),
+        );
+
+        
+        
+        executor::block_on(new_bot.initialize_channels());
+
+        tokio::spawn(async move {
+            new_bot.main_loop().await;
+        });
+        
+
+        here_control_tx.send(MatrixBotControlMessage::RequestChannels);
+
+        let mut recv_matrix_channel_infos = match here_control_rx.recv() {
+            Ok(data) => data,
+            Err(e) => panic!("Problem recv from control channel: {e:?}"),
+        };
+
+
+        let matrix_channel_infos = match recv_matrix_channel_infos {
+            MatrixBotControlMessage::UpdateChannels{ channels } => channels,
+            _ => panic!("First message received from mbot on control channel was not of type MatrixBotControlMessage::UpdateChannels")
+        }; // blocking recv
+        dbg!("Received channel info");
+
+        let new_bot_idx = &self.matrix_bots.len();
+        let new_bot_info = matrix_bot::MatrixBotInfo {
+            bot_address: botcred.bot_address.clone(),
+            platform: botcred.service_name.clone(),
+            num_channels: matrix_channel_infos.len(),
+            channel_infos: matrix_channel_infos,
+        };
+
+        self.matrix_bots.push(new_bot_info);
+        self.matrix_bot_channels.push(MatrixBotChannels(
+            here_tx, here_rx, here_control_tx, here_control_rx
+        ));
+
+        
+
+        Ok((&self.matrix_bots.len() - 1).try_into().unwrap()) // unwrap is ok here because we disallow insertions if length > 256
     }
 
     pub fn revoke_bot(&mut self, bot_index: usize) -> Result<(), ()> {
@@ -211,6 +300,7 @@ impl User {
         }
 
         self.matrix_bots.remove(bot_index);
+        // also remove channels and kill thread
 
         Ok(())
     }

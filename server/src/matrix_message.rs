@@ -2,6 +2,7 @@ use crate::matrix_bot;
 
 pub struct MatrixMessage {
     pub room_idx: usize,
+    pub display_name: String,
     pub content: String,
 }
 

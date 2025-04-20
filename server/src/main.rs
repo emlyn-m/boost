@@ -81,13 +81,51 @@ async fn main() -> anyhow::Result<()> {
     client.matrix_auth().login_username(&homeserver_creds.username, &homeserver_creds.password).send().await?;
     client.sync_once(matrix_sdk::config::SyncSettings::default()).await?;
 
-    // todo: setup threads for bridge bots?
-    let appservices: Vec::<Sender<matrix_message::MatrixMessage>> = vec![]; // this is sender of matrix_msg so it is how we send messages from sms to matrix
+    // initialize sync thread
+    let syncing_client = client.clone();
+    tokio::spawn( async move {
+        syncing_client.sync(matrix_sdk::config::SyncSettings::default()).await;
+    });
 
-    // todo: various setup
     let mut users: HashMap<String, user::User> = HashMap::new(); // (Phone no., User struct)
 
+    // todo: setup some buffer so we can iterate over the channels and record in a vec::<(string, vec::<matrix_message>) the phone number and all pending messages
+    // or just a vec::<string, matrix_message> even, the main loop will be running pretty fast
+    // that way we can iterate over that when we do our mutable borrows
+    let mut pending_msgs: Vec::<(String, usize, matrix_message::MatrixMessage)> = vec![]; // (ph number, domain idx, message)
+
     loop {
+
+        // loop over all users, and within that all matrix channels to see if we have messages we need to send
+        for (addr, user) in &users {
+
+            for i in 0..user.matrix_bot_channels.len() {
+                let channel = &user.matrix_bot_channels[i];
+
+                let outgoing_msg = channel.1.try_recv();
+                if outgoing_msg.is_ok() {
+                    let outgoing_msg = outgoing_msg.expect("Failed to unwrap OK value (incoming matrix msg in main loop)");
+
+                    pending_msgs.push((addr.clone(), i, outgoing_msg));
+                }
+
+
+                let control_msg = channel.3.try_recv();
+                if control_msg.is_ok() {
+                    let control_msg = control_msg.expect("Failed to unwrap OK value (control msg in main loop)");
+                    // todo: process control msg
+                }
+            }
+        }
+        for pending in pending_msgs.drain(..) {
+
+            let user = users.get_mut(&pending.0).expect("Failed to get user by pending message addr");
+            let true_content = format!("{}@{} {}", &pending.2.room_idx, &pending.1, pending.2.content);
+            user.send_message(BitVec::<u8,Lsb0>::from_vec(true_content.as_bytes().to_vec()), false, true);
+
+        }
+
+
 
         let mut new_block = match get_available_block() {
             None => { continue; },
@@ -345,6 +383,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
 
         sender.matrix_bot_channels[platform_idx].0.send(matrix_message::MatrixMessage {
             room_idx: user_idx,
+            display_name: String::new(),
             content: msg_content_str,
         });
 

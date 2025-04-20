@@ -54,7 +54,6 @@ impl MatrixBot {
     }
 
     pub async fn initialize_channels(&mut self) {
-        let mut channels: Vec::<MatrixChannel> = vec![];
         let room_child_events = self.dm_space.get_state_events(ruma::events::StateEventType::from("m.space.child")).await.expect("Failed to get child events");
             
         for event_enum in room_child_events {
@@ -99,10 +98,38 @@ impl MatrixBot {
 
     }
 
-    // todo: add command channel (for eg getting users, )
-    pub async fn main_loop(&mut self) {
 
-        // todo: likely setup handlers for new messages/new channels? or do we just poll hmmmmmm i think listeners are probably better
+    pub async fn main_loop(&mut self) {
+        // todo: setup more listeners
+
+        dbg!("N Channels: {}", self.channels.len());
+
+        for i in 0..self.channels.len() {
+            let room_tx_channel = self.internal_channels.0.clone();
+    
+            let room_idx = i.clone();
+            let room_dn = self.channels[i].display_name.clone();
+    
+            &(self.channels[i].room).add_event_handler(move |ev: SyncRoomMessageEvent| async move {
+
+                dbg!("RX Message");
+                let content = match ev {
+                    SyncRoomMessageEvent::Original(msg) => msg.content.body().to_string(),
+                    SyncRoomMessageEvent::Redacted(msg) => {println!("todo: Handle redacted events");return}
+                };
+                
+                dbg!(room_dn.clone());
+                dbg!(content.clone());
+                let channel_msg = MatrixMessage {
+                    room_idx: room_idx,
+                    display_name: room_dn, // display name of room (todo: should ideally transition to sender dn eventually)
+                    content: content
+                };
+    
+                room_tx_channel.send(channel_msg);
+            });
+        }
+    
 
 
         loop {

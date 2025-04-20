@@ -93,7 +93,6 @@ impl MatrixBot {
                 room: latest_convo_room,
                 room_id: convo_id.to_string(),
             });
-            dbg!(&self.channels[self.channels.len() - 1].display_name);
         }
 
     }
@@ -102,7 +101,6 @@ impl MatrixBot {
     pub async fn main_loop(&mut self) {
         // todo: setup more listeners
 
-        dbg!("N Channels: {}", self.channels.len());
 
         for i in 0..self.channels.len() {
             let room_tx_channel = self.internal_channels.0.clone();
@@ -112,14 +110,11 @@ impl MatrixBot {
     
             &(self.channels[i].room).add_event_handler(move |ev: SyncRoomMessageEvent| async move {
 
-                dbg!("RX Message");
                 let content = match ev {
                     SyncRoomMessageEvent::Original(msg) => msg.content.body().to_string(),
                     SyncRoomMessageEvent::Redacted(msg) => {println!("todo: Handle redacted events");return}
                 };
                 
-                dbg!(room_dn.clone());
-                dbg!(content.clone());
                 let channel_msg = MatrixMessage {
                     room_idx: room_idx,
                     display_name: room_dn, // display name of room (todo: should ideally transition to sender dn eventually)

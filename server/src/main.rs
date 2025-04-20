@@ -89,9 +89,6 @@ async fn main() -> anyhow::Result<()> {
 
     let mut users: HashMap<String, user::User> = HashMap::new(); // (Phone no., User struct)
 
-    // todo: setup some buffer so we can iterate over the channels and record in a vec::<(string, vec::<matrix_message>) the phone number and all pending messages
-    // or just a vec::<string, matrix_message> even, the main loop will be running pretty fast
-    // that way we can iterate over that when we do our mutable borrows
     let mut pending_msgs: Vec::<(String, usize, matrix_message::MatrixMessage)> = vec![]; // (ph number, domain idx, message)
 
     loop {
@@ -120,8 +117,10 @@ async fn main() -> anyhow::Result<()> {
         for pending in pending_msgs.drain(..) {
 
             let user = users.get_mut(&pending.0).expect("Failed to get user by pending message addr");
-            let true_content = format!("{}@{} {}", &pending.2.room_idx, &pending.1, pending.2.content);
-            user.send_message(BitVec::<u8,Lsb0>::from_vec(true_content.as_bytes().to_vec()), false, true);
+            let mut true_content_vec: Vec::<u8> = pending.2.content.as_bytes().to_vec();
+            true_content_vec.insert(0, pending.1.try_into().expect("Failed conversion usize -> u8")); // push platform idx
+            true_content_vec.insert(0, pending.2.room_idx.try_into().expect("Failed conversion usize -> u8"));  // push room idx
+            user.send_message(BitVec::<u8,Lsb0>::from_vec(true_content_vec), false, true);
 
         }
 

@@ -39,7 +39,7 @@ class Message:
     }
 
     MSG_PATTERN_COM = "bool, bool, bool, u5, u8, hex"  # mp_first, is_mp, is_command, msg_id, command_id, payload
-    MSG_PATTERN_DAT = "bool, bool, bool, u5, u8, u8, hex" # mp_first, is_mp, is_command, platform_id, user_id, payload (check order of platform and user)
+    MSG_PATTERN_DAT = "bool, bool, bool, u5, u8, u8, hex" # mp_first, is_mp, is_command, user_id, platform_id, payload
 
     def __init__(msg_id, f_is_command, f_is_multi, f_is_mp_first):
         pass
@@ -62,7 +62,7 @@ class Sender:
         self.is_enc = None
 
         self.domains = [None for i in range(256)]  # username@service-name, ...
-        self.users = [None for i in range(256)]  # [userInfo0, userInfo1, ...]
+        self.users = [[None for i in range(256)] for j in range(256)]  # [userInfo0, userInfo1, ...]
 
         self.domain_reqs = {}  # <msg_id: username@service_name>
 
@@ -140,6 +140,7 @@ class Cli:
 
     def receive_msg(self, data):
 
+        # TODO: If needed, send BlockAck in response to incoming message
         self.display(f"Server replied: hex[0x{data.hex()}]", lvl="debug")
         self.display(f"                bin[0b{bin(int(data.hex(), 16))[2:].zfill(len(data.hex()) * 4)}]", lvl="debug")
 
@@ -148,8 +149,6 @@ class Cli:
         data_vals = bsdata.unpack(Message.MSG_PATTERN_COM)
 
         self.display(f"ID: {data_vals[3]}", lvl="prod")
-        command_type = data_vals[4]
-        self.display(f"Command: {Message.COMMANDS_REVERSE[command_type]}", lvl="prod")
         payload = data_vals[5]
 
         try:
@@ -160,24 +159,42 @@ class Cli:
         if data_vals[1]:
             self.display("Multipart messages unsupported!", lvl="warn")
             return
+        
 
+        if data_vals[2] == False:
+            # Data type message
 
-        if command_type == Message.COMMANDS["DhkeInit"]:
-            server_public = bytes.fromhex(data_vals[5][::-1][:64][::-1])
-            self.agent.enc_key = x25519.scalar_mult(self.agent.enc_secret, server_public)
-            print(self.agent.enc_key.hex())
-            
+            data_vals = bsdata.unpack(Message.MSG_PATTERN_DAT)
+            sender_idx = int(data_vals[4])
+            platform_idx = int(data_vals[5])
+            msg_content = bytes.decode(bytes.fromhex(data_vals[6]), 'utf-8').replace("\x00", "")
 
-        elif Message.COMMANDS_REVERSE[command_type] == "AuthResult":
-            status_res = int(payload[:2], 16)
-            if status_res != 1:
-                self.display("Error: Authentication failed", lvl="prod")
-                return
+            self.display("Received new message:", lvl="prod")
+            self.display(f"\tSender: {self.agent.users[platform_idx][sender_idx]} ({sender_idx})", lvl="prod")
+            self.display(f"\tPlatform: {self.agent.domains[platform_idx]} ({platform_idx})", lvl="prod")
+            self.display(f"\tContent: {msg_content}", lvl="prod")
 
-            msg_responding_to = int(payload[2:4], 16)
-            domain_idx = int(payload[4:6], 16)
-            self.agent.domains[domain_idx] = self.agent.domain_reqs[msg_responding_to]
-            del self.agent.domain_reqs[msg_responding_to]
+        else:
+            # Command type message
+            command_type = data_vals[4]
+            self.display(f"Command: {Message.COMMANDS_REVERSE[command_type]}", lvl="prod")
+
+            if command_type == Message.COMMANDS["DhkeInit"]: # this is silly
+                server_public = bytes.fromhex(data_vals[5][::-1][:64][::-1])
+                self.agent.enc_key = x25519.scalar_mult(self.agent.enc_secret, server_public)
+                print(self.agent.enc_key.hex())
+                
+
+            elif Message.COMMANDS_REVERSE[command_type] == "AuthResult":
+                status_res = int(payload[:2], 16)
+                if status_res != 1:
+                    self.display("Error: Authentication failed", lvl="prod")
+                    return
+
+                msg_responding_to = int(payload[2:4], 16)
+                domain_idx = int(payload[4:6], 16)
+                self.agent.domains[domain_idx] = self.agent.domain_reqs[msg_responding_to]
+                del self.agent.domain_reqs[msg_responding_to]
 
 
 
@@ -247,11 +264,11 @@ class CommandHandler:
                 cli.display(strings.PH_INVALID, lvl="err", showlvl=True)
 
         cli.agent = Sender(cph, cli)
+        cli.display(f"Set phone number to [{cph}]", lvl="prod")
 
     def handle_init(cli, _com):
 
         cli.agent.enc_secret = secrets.token_bytes(32)
-        print("client public: ")
         cli.agent.send_msg("DhkeInit", x25519.scalar_base_mult(cli.agent.enc_secret).hex())
 
 

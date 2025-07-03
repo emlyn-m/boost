@@ -17,6 +17,7 @@ class Message:
         "DAT": 0,
         "DhkeInit": 1,
         "AuthToAcc": 4,
+        "ReqDomains": 15,
         "ReqKnownUsers": 7,
         "RevokeAllClients": 13,
         "SignOut": 14, 
@@ -25,26 +26,12 @@ class Message:
         "DuplicateBlock": 10,
     }
 
-    COMMANDS_REVERSE = {
-        1: "DhkeInit",
-        3: "Unencrypted",
-        12: "AuthResult",
-        5: "UnknownDomain",
-        6: "UserNotFound",
-        8: "Error",
-        9: "InvalidCommand",
-        10: "DuplicateBlock",
-        11: "BlockAck"
-        
-    }
-
     MSG_PATTERN_COM = "bool, bool, bool, u5, u8, hex"  # mp_first, is_mp, is_command, msg_id, command_id, payload
     MSG_PATTERN_DAT = "bool, bool, bool, u5, u8, u8, hex" # mp_first, is_mp, is_command, user_id, platform_id, payload
 
     def __init__(msg_id, f_is_command, f_is_multi, f_is_mp_first):
         pass
-
-
+Message.COMMANDS_REVERSE = {Message.COMMANDS[command_name]: command_name for command_name in Message.COMMANDS}
 
 class Sender:
 
@@ -182,7 +169,6 @@ class Cli:
             if command_type == Message.COMMANDS["DhkeInit"]: # this is silly
                 server_public = bytes.fromhex(data_vals[5][::-1][:64][::-1])
                 self.agent.enc_key = x25519.scalar_mult(self.agent.enc_secret, server_public)
-                print(self.agent.enc_key.hex())
                 
 
             elif Message.COMMANDS_REVERSE[command_type] == "AuthResult":
@@ -322,24 +308,28 @@ class CommandHandler:
                 cli.display("Unknown domain", lvl="err")
                 return
 
-            cli.display(f"{strings.BOLD}{cli.agent.domains[domain_idx]}{strings.RESET}")
+            cli.display(f"{strings.BOLD}Current users on domain {cli.agent.domains[domain_idx]}:{strings.RESET}", showlvl=False)
 
-            if not cli.agent.users[domain_idx]:
-                cli.display("No users on domain", showlvl=False)
-                return
 
-            for user in cli.agent.users[domain_idx]:
-                cli.display(f"{user}")
+            for i, user in enumerate(cli.agent.users[domain_idx]):
+                if user:
+                    cli.display(f"[{i:03d}] {user}")
 
         else:
             cli.display("Invalid command format", lvl="err", showlvl=True)
 
 
     def handle_reqdomains(cli, _com):
-        cli.display("Unimplented", lvl="warn")
+        cli.agent.send_msg("ReqDomains", '')
 
     def handle_requsers(cli, com):
-        cli.display("Unimplented", lvl="warn")
+        if not (com and len(com.split(' ')) == 2):
+            cli.display("Incorrect format", lvl='err')
+            return
+
+        domain_index = f"{int(com.split(' ')[1]):02x}"
+        cli.agent.send_msg("ReqKnownUsers", domain_index)
+
 
     def handle_logout(cli, com):
         domain_idx = com.split(' ')[1]

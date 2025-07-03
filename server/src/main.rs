@@ -111,6 +111,7 @@ async fn main() -> anyhow::Result<()> {
                 if control_msg.is_ok() {
                     let control_msg = control_msg.expect("Failed to unwrap OK value (control msg in main loop)");
                     // todo: process control msg
+                    
                 }
             }
         }
@@ -208,8 +209,20 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                 match shared_secret {
                     Ok(val) => send_command(sender, command::CommandValue::DhkeInit as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(val.to_vec()), false),
                     Err(e) => send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()), false),
-                };
+                }
             }
+            _ => { }
+        }
+
+        if !sender.is_encrypted { 
+            dbg!("All commands require encryption");
+            send_command(sender, command::CommandValue::Unencrypted as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Commands beyond INIT cannot be sent before encryption is complete".as_bytes().to_vec()), false); 
+            return;
+        } 
+
+
+        match command_type {
+            
             // command::CommandValue::DhkeUpdate => { 
             //     dbg!("DH Update");
             //     if !sender.is_encrypted {
@@ -346,7 +359,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
         // data messages cannot be sent if the user is unencrypted
         if !sender.is_encrypted { 
             dbg!("Send failed - no encryption");
-            send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Messages cannot be sent before encryption is complete".as_bytes().to_vec()), false); 
+            send_command(sender, command::CommandValue::Unencrypted as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Messages cannot be sent before encryption is complete".as_bytes().to_vec()), false); 
             return;
         } 
 

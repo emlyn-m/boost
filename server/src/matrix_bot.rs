@@ -93,6 +93,7 @@ impl MatrixBot {
                 room: latest_convo_room,
                 room_id: convo_id.to_string(),
             });
+
         }
 
     }
@@ -169,14 +170,14 @@ impl MatrixBot {
 
 pub struct MatrixChannel {
     // store channel id, metadata, etc.
-    display_name: String,
+    pub display_name: String,
     room: matrix_sdk::room::Room,
     room_id: String,
 }
 pub struct MatrixChannelInfo {
     idx: u32,
     room_id: String,
-    display_name: String,
+    pub display_name: String,
 }
 
 

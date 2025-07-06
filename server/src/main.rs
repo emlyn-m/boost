@@ -90,11 +90,30 @@ async fn main() -> anyhow::Result<()> {
     let mut users: HashMap<String, user::User> = HashMap::new(); // (Phone no., User struct)
 
     let mut pending_msgs: Vec::<(String, usize, matrix_message::MatrixMessage)> = vec![]; // (ph number, domain idx, message)
+    let mut pending_control_msgs: Vec::<(String, matrix_message::MatrixBotControlMessage)> = vec![];
 
     loop {
 
         // loop over all users, and within that all matrix channels to see if we have messages we need to send
-        for (addr, user) in &users {
+        for (addr, mut user) in &mut users {
+
+            // check if we need to send out channel update to user
+            for i in 0..user.client_has_latest_channel_list.len() {
+                if (!&user.client_has_latest_channel_list[i]) {
+                    let updated_channel_data = &mut BitVec::<u8,Lsb0>::new();
+
+                    for channel in &user.matrix_bots[i].channel_infos {
+                        let mut latest_ch_name_vec = BitVec::<u8,Lsb0>::from_vec(channel.display_name.as_bytes().to_vec());
+                        for channel_name_bit in latest_ch_name_vec.drain(0..latest_ch_name_vec.len()) {
+                            updated_channel_data.push(channel_name_bit);
+                        }
+                        for _ in 0..8 {
+                            updated_channel_data.push(false);  // todo: do not pack trailing null byte
+                        }
+                    }
+                    send_command(&mut user, command::CommandValue::ChannelUpdate as command::CommandInt, updated_channel_data, false);
+                }
+            }
 
             for i in 0..user.matrix_bot_channels.len() {
                 let channel = &user.matrix_bot_channels[i];
@@ -111,6 +130,16 @@ async fn main() -> anyhow::Result<()> {
                 if control_msg.is_ok() {
                     let control_msg = control_msg.expect("Failed to unwrap OK value (control msg in main loop)");
                     // todo: process control msg
+
+                    match control_msg {
+                        matrix_message::MatrixBotControlMessage::UpdateChannels{ channels } => {
+                            dbg!("ChUpdate MBOT Ctrl recv. in main");
+
+
+                            continue;
+                        },
+                        _ => { dbg!("Unimpleted control msg"); },
+                    }
                     
                 }
             }
@@ -122,6 +151,12 @@ async fn main() -> anyhow::Result<()> {
             true_content_vec.insert(0, pending.1.try_into().expect("Failed conversion usize -> u8")); // push platform idx
             true_content_vec.insert(0, pending.2.room_idx.try_into().expect("Failed conversion usize -> u8"));  // push room idx
             user.send_message(BitVec::<u8,Lsb0>::from_vec(true_content_vec), false, true);
+
+        }
+
+        for pending_ctrl in pending_control_msgs.drain(..) {
+
+            // todo: this
 
         }
 
@@ -210,6 +245,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                     Ok(val) => send_command(sender, command::CommandValue::DhkeInit as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(val.to_vec()), false),
                     Err(e) => send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()), false),
                 }
+                return;  // need explicit here so we dont fall to the second match statement and send invalid command
             }
             _ => { }
         }
@@ -323,7 +359,18 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                 send_command(sender, command::CommandValue::AuthenticationResult as command::CommandInt, &mut payload, false);
 
              }
-            command::CommandValue::RequestKnownUsers => {  } // todo: this
+            command::CommandValue::RequestKnownUsers => {
+                let domain_idx: usize = actual_payload[0].try_into().expect("u8 to usize conversion failed somehow");
+                let mbot_channel_ref = match sender.matrix_bot_channels.get(domain_idx) {
+                    Some(ch_ref) => ch_ref,
+                    None => {
+                        send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("No such domain".as_bytes().to_vec()), false);
+                        return;
+                    }
+                };
+                &mbot_channel_ref.2.send(matrix_message::MatrixBotControlMessage::RequestChannels);
+                // todo: ack, etc.
+             }
             command::CommandValue::RequestDomains => {  }
             command::CommandValue::BlockAck => { 
                 let block_ack_send_result = sender.process_block_ack(&actual_payload); 
@@ -351,7 +398,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
 
                 
             }
-            _ => { send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false); }
+            _ => { send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Unknown Command".as_bytes().to_vec()), false); }
         }
 
 

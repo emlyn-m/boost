@@ -18,6 +18,7 @@ pub enum CommandValue {
     SignOut = 14, // Deauthenticate the sender from a given bot (send bot_idx)
     RevokeAllClients = 13, // Revoke _all_ boost clients authentication with a given bot (requires authentication with the bot obv) (send bot address)
     RequestDomains = 15, // TODO: Do we have a response to this and RequestKnownUsers?
+    ChannelUpdate = 16, // response to RequestKnownUsers
 
     // message related
     UnknownDomain = 5, // (used as a response to DAT [ user_idx@domain_idx payload ])

@@ -35,6 +35,8 @@ pub struct User {
 
     pub matrix_bots: Vec::<matrix_bot::MatrixBotInfo>,
     pub matrix_bot_channels: Vec::<MatrixBotChannels>,
+    pub client_has_latest_channel_list: Vec::<bool>,
+    pub client_has_latest_domain_info: bool,
 }
 
 impl User {
@@ -50,6 +52,8 @@ impl User {
             client,
             matrix_bots: vec![],
             matrix_bot_channels: vec![],
+            client_has_latest_channel_list: vec![],
+            client_has_latest_domain_info: false,
         };
 
         for i in 1<<4..1<<5 {
@@ -221,12 +225,10 @@ impl User {
 
         for i in 0..self.matrix_bots.len() {
             if (&self.matrix_bots[i]).bot_address == botcred.bot_address {
+                self.client_has_latest_channel_list[i] = false;  // if they are authenticating, cannot assume they have latest list
                 return Ok(i.try_into().unwrap());
             }
         }
-
-        // todo: figure out how we actually get sms messages from this
-            // likely frequent polling at same point as polling for sms
 
         // we need a bidirectional channel interface, so two channels just for data
         let (here_tx, mbot_rx): (Sender::<MatrixMessage>, Receiver::<MatrixMessage>) = mpsc::channel();
@@ -282,7 +284,7 @@ impl User {
         ));
 
         
-
+        self.client_has_latest_channel_list.push(false);
         Ok((&self.matrix_bots.len() - 1).try_into().unwrap()) // unwrap is ok here because we disallow insertions if length > 256
     }
 
@@ -291,6 +293,7 @@ impl User {
             return Err(());
         }
 
+        self.client_has_latest_channel_list.remove(bot_index);
         self.matrix_bots.remove(bot_index);
         //todo:  also remove channels and kill thread
 

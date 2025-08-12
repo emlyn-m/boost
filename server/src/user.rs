@@ -138,8 +138,8 @@ impl User {
             let mut new_block = bitvec![u8, Lsb0; 0; header_size];
             new_block[0..5].store::<u8>(new_msg_id);
             new_block[5..6].store::<u8>(if is_command { 1 } else { 0 });
-            new_block[6..7].store::<u8>(if num_blocks == 1 { 1 } else { 0 });
-            new_block[7..8].store::<u8>(0);
+            new_block[6..7].store::<u8>(1);  // is_mp - guaranteed 1
+            new_block[7..8].store::<u8>(0);  // mp_first - guaranteed 0
             if num_blocks > 1 { new_block[8..16].store::<u8>((i - 1) as u8); }
             for j in 0..std::cmp::min(new_message.len() - (payload_size - 2)*8*i, (payload_size - 2)*8) { // why: is there a -2??
                 new_block.push(new_message[i*(payload_size - 2)*8 + j]);
@@ -165,7 +165,7 @@ impl User {
             outfile_path += new_msg_id.to_string().as_str();
             outfile_path += "-";
             outfile_path += i.to_string().as_str();
-            let mut outfile = std::fs::File::create(outfile_path).expect("Failed to open sharedmem output");
+            let mut outfile = std::fs::File::create(outfile_path.clone()).expect(&format!("Failed to open sharedmem output: {}", &outfile_path.as_str()).as_str());  // this is panicking on mp messages
             let _ = outfile.write(&(output_blocks[i].as_raw_slice()));
         }
 

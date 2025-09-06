@@ -16,18 +16,28 @@ class Message:
     COMMANDS = {
         "DAT": 0,
         "DhkeInit": 1,
+        "Unencrypted": 3,
         "AuthToAcc": 4,
-        "ReqDomains": 15,
+        "UnknownDomain": 5,
+        "TargetUserNotFound": 6,
         "ReqKnownUsers": 7,
+        "Error": 8,
+        "InvalidCommand": 9,
+        "DuplicateBlock": 10,
+        "BlockAck": 11,
+        "AuthResult": 12,
         "RevokeAllClients": 13,
         "SignOut": 14, 
-        "BlockAck": 11,
-        "Error": 8,
-        "DuplicateBlock": 10,
+        "ReqDomains": 15,
+        "ChannelUpdate": 16,
     }
 
-    MSG_PATTERN_COM = "bool, bool, bool, u5, u8, hex"  # mp_first, is_mp, is_command, msg_id, command_id, payload
-    MSG_PATTERN_DAT = "bool, bool, bool, u5, u8, u8, hex" # mp_first, is_mp, is_command, user_id, platform_id, payload
+    OUTGOING_PATTERN_COM = "bool, bool, bool, u5, u8, hex"
+    OUTGOING_PATTERN_DAT = "bool, bool, bool, u5, u8, u8, hex"
+
+    INCOMING_PATTERN = "bool, bool, bool, u5, hex"  # mp_first, is_mp, is_command, msg_id, payload
+    PAYLOAD_PATTERN_COM = "u8, hex"  # command_id, payload
+    PAYLOAD_PATTERN_DAT = "u8, u8, hex" # user_id, platform_id, payload
 
     def __init__(msg_id, f_is_command, f_is_multi, f_is_mp_first):
         pass
@@ -53,14 +63,16 @@ class Sender:
 
         self.domain_reqs = {}  # <msg_id: username@service_name>
 
+        self.outstanding_mp_msgs = {}  # Map<MsgId: PartialMessage>
+
     def send_msg(self, command, payload):  # todo: multipart support
         self.msg_id = (self.msg_id + 1) % 32
 
         msg = None
         if command == "DAT":
-            msg = bitstring.pack(Message.MSG_PATTERN_DAT, True, False, False, self.msg_id, payload[0], payload[1], payload[2]) # user_idx THEN platform_idx
+            msg = bitstring.pack(Message.OUTGOING_PATTERN_DAT, True, False, False, self.msg_id, payload[0], payload[1], payload[2]) # user_idx THEN platform_idx
         else:
-            msg = bitstring.pack(Message.MSG_PATTERN_COM, True, False, True, self.msg_id, Message.COMMANDS[command], payload)
+            msg = bitstring.pack(Message.OUTGOING_PATTERN_COM, True, False, True, self.msg_id, Message.COMMANDS[command], payload)
 
         
         msg = msg.tobytes()
@@ -76,6 +88,32 @@ class Sender:
 
     def decrypt_msg(self, msg_str):
         return msg_str
+
+class PartialMessage:
+
+    def __init__(self, msg_id):
+        self.msg_id = msg_id
+        self.components = [None for i in range(256)]
+        self.n_blocks = -1
+        self.is_command_type = False
+
+    def add_block(self, block_id, is_mp_first, is_command, block_payload):
+        self.is_command_type = is_command
+        
+        if is_mp_first:
+            self.n_blocks = (block_id + 1)  # Cheat to squeeze one more block per message out
+            self.components[0] = block_payload
+        else:
+            self.components[(block_id+1)] = block_payload
+
+
+    def is_complete(self):
+        n_received = sum([1 if x else 0 for x in self.components])
+        return n_received == self.n_blocks
+
+    def get_full(self):
+        payload = "".join(self.components[:self.n_blocks])
+        return (self.is_command_type, payload)
 
 class Cli:
 
@@ -122,39 +160,55 @@ class Cli:
                 payload = inf.read()
 
             os.remove(os.path.abspath(SHAREDMEM_OUTPUT + file))
-            self.receive_msg(payload)
+            self.preprocess_msg(payload)
 
 
-    def receive_msg(self, data):
-
-        # TODO: If needed, send BlockAck in response to incoming message
+    def preprocess_msg(self, data):
+        # Process headers/encryption of incoming messages
         self.display(f"Server replied: hex[0x{data.hex()}]", lvl="debug")
         self.display(f"                bin[0b{bin(int(data.hex(), 16))[2:].zfill(len(data.hex()) * 4)}]", lvl="debug")
 
-
         bsdata = bitstring.BitArray(data)
-        data_vals = bsdata.unpack(Message.MSG_PATTERN_COM)
+        data_vals = bsdata.unpack(Message.INCOMING_PATTERN)
 
-        self.display(f"ID: {data_vals[3]}", lvl="prod")
-        payload = data_vals[5]
+        payload = data_vals[4]
+        is_command = data_vals[2]
+
+        if data_vals[1]:
+            msg_id = data_vals[3]
+            is_mp_first = data_vals[0]
+            block_id = int(payload[:2], 16)
+            actual_payload = payload[2:]
+
+            if msg_id not in self.agent.outstanding_mp_msgs:
+                self.agent.outstanding_mp_msgs[msg_id] = PartialMessage(msg_id)
+            self.agent.outstanding_mp_msgs[msg_id].add_block(block_id, is_mp_first, is_command, actual_payload)
+            if (self.agent.outstanding_mp_msgs[msg_id].is_complete()):
+                iscom, full_msg = self.agent.outstanding_mp_msgs[msg_id].get_full()                
+                self.receive_msg(iscom, full_msg)
+
+        else:
+            self.receive_msg(is_command, payload)
+
+        # TODO: If needed, send BlockAck in response to incoming message
+
+
+    def receive_msg(self, is_command, payload):
 
         try:
             self.display(f"Payload: {bytes.decode(bytes.fromhex(payload), 'utf-8').replace("\x00", "")}", lvl="prod")
         except UnicodeDecodeError:
             self.display(f"Payload: {payload}", lvl="prod")
 
-        if data_vals[1]:
-            self.display("Multipart messages unsupported!", lvl="warn")
-            return
-        
+        bsdata = bitstring.BitArray(hex=payload)
 
-        if data_vals[2] == False:
+        if not is_command:
             # Data type message
+            data_vals = bsdata.unpack(Message.PAYLOAD_PATTERN_DAT)
 
-            data_vals = bsdata.unpack(Message.MSG_PATTERN_DAT)
-            sender_idx = int(data_vals[4])
-            platform_idx = int(data_vals[5])
-            msg_content = bytes.decode(bytes.fromhex(data_vals[6]), 'utf-8').replace("\x00", "")
+            sender_idx = int(data_vals[0], 16)
+            platform_idx = int(data_vals[1], 16)
+            msg_content = bytes.decode(bytes.fromhex(data_vals[2]), 'utf-8').replace("\x00", "")
 
             self.display("Received new message:", lvl="prod")
             self.display(f"\tSender: {self.agent.users[platform_idx][sender_idx]} ({sender_idx})", lvl="prod")
@@ -163,11 +217,14 @@ class Cli:
 
         else:
             # Command type message
-            command_type = data_vals[4]
+            data_vals = bsdata.unpack(Message.PAYLOAD_PATTERN_COM)
+
+            command_type = data_vals[0]
+            payload = data_vals[1]
             self.display(f"Command: {Message.COMMANDS_REVERSE[command_type]}", lvl="prod")
 
             if command_type == Message.COMMANDS["DhkeInit"]: # this is silly
-                server_public = bytes.fromhex(data_vals[5][::-1][:64][::-1])
+                server_public = bytes.fromhex(data_vals[1][::-1][:64][::-1])
                 self.agent.enc_key = x25519.scalar_mult(self.agent.enc_secret, server_public)
                 
 
@@ -181,6 +238,10 @@ class Cli:
                 domain_idx = int(payload[4:6], 16)
                 self.agent.domains[domain_idx] = self.agent.domain_reqs[msg_responding_to]
                 del self.agent.domain_reqs[msg_responding_to]
+
+            elif Message.COMMANDS_REVERSE[command_type] == "ChannelUpdate":
+                ResponseCommandHandler.recvhandle_chupdate(self, payload)
+                
 
 
 
@@ -197,6 +258,22 @@ class Cli:
 
         else:
             self.display("Unknown command", lvl="err", showlvl=True)
+
+class ResponseCommandHandler:
+
+    def recvhandle_init(cli, com):
+        cli.display("Unimplemented", lvl='warn')  # todo
+
+    def recvhandle_authresult(cli, com):
+        cli.display("Unimplemented", lvl='warn')  # todo
+
+    def recvhandle_chupdate(cli, com):
+        domain_idx  = int(com[:2], 16)
+        newChannelData = bytes.decode(bytes.fromhex(com[2:])).split('\x00')
+        cli.display(f"New data on domain {domain_idx}", lvl='prod')
+        cli.agent.users[domain_idx] = newChannelData[:-1]  # todo: remove this fix for rs packing a trailing null byte
+        cli.display(f'\t{','.join([f'[{i}] {u}' for i,u in enumerate(cli.agent.users[domain_idx])])}', lvl='debug')
+
 
 
 

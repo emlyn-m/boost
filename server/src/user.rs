@@ -7,6 +7,7 @@ use crate::credential_manager;
 use crate::matrix_message::{
     MatrixMessage, MatrixBotControlMessage
 };
+use crate::randchar::generate_random_str;
 
 use bitvec::prelude::*;
 use x25519_dalek;
@@ -53,7 +54,7 @@ impl User {
             matrix_bots: vec![],
             matrix_bot_channels: vec![],
             client_has_latest_channel_list: vec![],
-            client_has_latest_domain_info: false,
+            client_has_latest_domain_info: false,  // totally unsure what the diff between channel info and domain_info
         };
 
         for i in 1<<4..1<<5 {
@@ -165,6 +166,8 @@ impl User {
             outfile_path += new_msg_id.to_string().as_str();
             outfile_path += "-";
             outfile_path += i.to_string().as_str();
+            outfile_path += "-";
+            outfile_path += generate_random_str(10).as_str();
             let mut outfile = std::fs::File::create(outfile_path.clone()).expect(&format!("Failed to open sharedmem output: {}", &outfile_path.as_str()).as_str());  // this is panicking on mp messages
             let _ = outfile.write(&(output_blocks[i].as_raw_slice()));
         }

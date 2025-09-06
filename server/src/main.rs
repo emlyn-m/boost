@@ -6,6 +6,7 @@ mod outgoing_message;
 mod credential_manager;
 mod matrix_bot;
 mod matrix_message;
+mod randchar;
 
 use bitvec::prelude::*;
 use std::collections::HashMap;
@@ -101,7 +102,9 @@ async fn main() -> anyhow::Result<()> {
             for i in 0..user.client_has_latest_channel_list.len() {
                 if (!&user.client_has_latest_channel_list[i]) {
                     let updated_channel_data = &mut BitVec::<u8,Lsb0>::new();
+                    updated_channel_data.append(&mut BitVec::<u8,Lsb0>::from_element(i.try_into().expect("Failed to move domain_idx to u8 when sending update to client")));
 
+                    dbg!(&user.matrix_bots[i].channel_infos.len());
                     for channel in &user.matrix_bots[i].channel_infos {
                         let mut latest_ch_name_vec = BitVec::<u8,Lsb0>::from_vec(channel.display_name.as_bytes().to_vec());
                         for channel_name_bit in latest_ch_name_vec.drain(0..latest_ch_name_vec.len()) {
@@ -111,7 +114,9 @@ async fn main() -> anyhow::Result<()> {
                             updated_channel_data.push(false);  // todo: do not pack trailing null byte
                         }
                     }
-                    send_command(&mut user, command::CommandValue::ChannelUpdate as command::CommandInt, updated_channel_data, false);
+                    dbg!("Send chUpdate");
+                    send_command(&mut user, command::CommandValue::ChannelUpdate as command::CommandInt, updated_channel_data, false); 
+                    user.client_has_latest_channel_list[i] = true;  // todo: some day add timeout to this
                 }
             }
 

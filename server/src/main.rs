@@ -104,15 +104,20 @@ async fn main() -> anyhow::Result<()> {
                     let updated_channel_data = &mut BitVec::<u8,Lsb0>::new();
                     updated_channel_data.append(&mut BitVec::<u8,Lsb0>::from_element(i.try_into().expect("Failed to move domain_idx to u8 when sending update to client")));
 
-                    dbg!(&user.matrix_bots[i].channel_infos.len());
-                    for channel in &user.matrix_bots[i].channel_infos {
+                    let n_channels = (&user.matrix_bots[i].channel_infos).len();
+                    dbg!(n_channels);
+                    for j in 0..n_channels {
+                        let channel = &user.matrix_bots[i].channel_infos[j];
                         let mut latest_ch_name_vec = BitVec::<u8,Lsb0>::from_vec(channel.display_name.as_bytes().to_vec());
                         for channel_name_bit in latest_ch_name_vec.drain(0..latest_ch_name_vec.len()) {
                             updated_channel_data.push(channel_name_bit);
                         }
-                        for _ in 0..8 {
-                            updated_channel_data.push(false);  // todo: do not pack trailing null byte
+                        if j < (n_channels - 1) {
+                            for _ in 0..8 {
+                                updated_channel_data.push(false);
+                            }
                         }
+                        
                     }
                     dbg!("Send chUpdate");
                     send_command(&mut user, command::CommandValue::ChannelUpdate as command::CommandInt, updated_channel_data, false); 

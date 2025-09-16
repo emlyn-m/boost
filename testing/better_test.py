@@ -32,6 +32,25 @@ class Message:
         "ChannelUpdate": 16,
     }
 
+    NEEDS_ACK = {
+        "DAT": 1,
+        "DhkeInit": 0,
+        "Unencrypted": 0,
+        "AuthToAcc": 1,  # Not relevant to client sending ACK
+        "UnknownDomain": 0,
+        "TargetUserNotFound": 0,
+        "ReqKnownUsers": 0,
+        "Error": 0,
+        "InvalidCommand": 0,
+        "DuplicateBlock": 0,
+        "BlockAck": 0,
+        "AuthResult": 0,
+        "RevokeAllClients": 1,
+        "SignOut": 1,
+        "ReqDomains": 0,
+        "ChannelUpdate": 1,
+    }
+
     OUTGOING_PATTERN_COM = "bool, bool, bool, u5, u8, hex"
     OUTGOING_PATTERN_DAT = "bool, bool, bool, u5, u8, u8, hex"
 
@@ -141,8 +160,6 @@ class Cli:
         self.agent = None
         ph = CommandHandler.handle_ph(self, None)
 
-    
-
     def display(self, msg, lvl="prod", endl="\n", showlvl=True):
         if self.LOG_LEVELS[lvl] >= self.log_level:
             if showlvl:
@@ -195,10 +212,7 @@ class Cli:
 
     def receive_msg(self, is_command, payload):
 
-        try:
-            self.display(f"Payload: {bytes.decode(bytes.fromhex(payload), 'utf-8').replace("\x00", "")}", lvl="prod")
-        except UnicodeDecodeError:
-            self.display(f"Payload: {payload}", lvl="prod")
+        self.display(f"Payload: {payload.replace("\x00", "")}", lvl="prod")
 
         bsdata = bitstring.BitArray(hex=payload)
 
@@ -208,7 +222,7 @@ class Cli:
 
             sender_idx = int(data_vals[0], 16)
             platform_idx = int(data_vals[1], 16)
-            msg_content = bytes.decode(bytes.fromhex(data_vals[2]), 'utf-8').replace("\x00", "")
+            msg_content = data_vals[2].replace("\x00", "")
 
             self.display("Received new message:", lvl="prod")
             self.display(f"\tSender: {self.agent.users[platform_idx][sender_idx]} ({sender_idx})", lvl="prod")
@@ -224,30 +238,17 @@ class Cli:
             self.display(f"Command: {Message.COMMANDS_REVERSE[command_type]}", lvl="prod")
 
             if command_type == Message.COMMANDS["DhkeInit"]: # this is silly
-                server_public = bytes.fromhex(data_vals[1][::-1][:64][::-1])
-                self.agent.enc_key = x25519.scalar_mult(self.agent.enc_secret, server_public)
-                
+                ResponseCommandHandler.recvhandle_init(self, payload)
 
             elif Message.COMMANDS_REVERSE[command_type] == "AuthResult":
-                status_res = int(payload[:2], 16)
-                if status_res != 1:
-                    self.display("Error: Authentication failed", lvl="prod")
-                    return
-
-                msg_responding_to = int(payload[2:4], 16)
-                domain_idx = int(payload[4:6], 16)
-                self.agent.domains[domain_idx] = self.agent.domain_reqs[msg_responding_to]
-                del self.agent.domain_reqs[msg_responding_to]
+                ResponseCommandHandler.recvhandle_authresult(self, payload)
 
             elif Message.COMMANDS_REVERSE[command_type] == "ChannelUpdate":
                 ResponseCommandHandler.recvhandle_chupdate(self, payload)
-                
-
 
 
     def user_input(self):
         command = input(strings.COMMAND_INPUT)
-
 
         for command_prefix, handler_func in CommandHandler.COMMAND_PREFIX_FUNCS.items():
 
@@ -259,21 +260,31 @@ class Cli:
         else:
             self.display("Unknown command", lvl="err", showlvl=True)
 
+
 class ResponseCommandHandler:
 
-    def recvhandle_init(cli, com):
-        cli.display("Unimplemented", lvl='warn')  # todo
+    def recvhandle_init(cli, dat):
+        server_public = bytes.fromhex(dat[::-1][:64][::-1])
+        cli.agent.enc_key = x25519.scalar_mult(cli.agent.enc_secret, server_public)
+        cli.display("Established shared secret", lvl="prod")
 
-    def recvhandle_authresult(cli, com):
-        cli.display("Unimplemented", lvl='warn')  # todo
+    def recvhandle_authresult(cli, dat):
+        status_res = int(dat[:2], 16)
+        if status_res != 1:
+            cli.display("Error: Authentication failed", lvl="prod")
+            return
 
-    def recvhandle_chupdate(cli, com):
-        domain_idx  = int(com[:2], 16)
-        newChannelData = bytes.decode(bytes.fromhex(com[2:])).split('\x00')
+        msg_responding_to = int(dat[2:4], 16)
+        domain_idx = int(dat[4:6], 16)
+        cli.agent.domains[domain_idx] = cli.agent.domain_reqs[msg_responding_to]
+        del cli.agent.domain_reqs[msg_responding_to]
+
+
+    def recvhandle_chupdate(cli, dat):
+        domain_idx  = int(dat[:2], 16)
+        cli.agent.users[domain_idx] = dat[2:].split('\x00')
         cli.display(f"New data on domain {domain_idx}", lvl='prod')
-        cli.agent.users[domain_idx] = newChannelData[:-1]  # todo: remove this fix for rs packing a trailing null byte
         cli.display(f'\t{','.join([f'[{i}] {u}' for i,u in enumerate(cli.agent.users[domain_idx])])}', lvl='debug')
-
 
 
 
@@ -421,7 +432,7 @@ class CommandHandler:
         
 
     def handle_revoke_all_clients(cli, com):
-        cli.display("Error: Unimplemented", lvl="err")
+        cli.display("Error: Unimplemented (RevokeAllClients)", lvl="err")
 
 
 

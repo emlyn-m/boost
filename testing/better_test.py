@@ -162,6 +162,19 @@ class Cli:
 
     def display(self, msg, lvl="prod", endl="\n", showlvl=True):
         if self.LOG_LEVELS[lvl] >= self.log_level:
+
+            msgSanitized = ""  # Replace non-printable chars with unciode SYMBOL FOR characters
+            for char in msg:
+                if (ord(char) <= 0x20):
+                    msgSanitized += chr(0x2400 + ord(char))
+
+                elif (ord(char) == 0x7f): # Delete
+                    msgSanitized += chr(0x2421)
+
+                else:
+                    msgSanitized += char
+
+
             if showlvl:
                 print(f"{Cli.LOG_COLORS[lvl]}[{lvl}]\x1b[0m", end=" ")
             print(msg, end="")
@@ -282,9 +295,9 @@ class ResponseCommandHandler:
 
     def recvhandle_chupdate(cli, dat):
         domain_idx  = int(dat[:2], 16)
-        cli.agent.users[domain_idx] = dat[2:].split('\x00')
+        cli.agent.users[domain_idx] = bytes.fromhex(dat[2:]).decode('utf-8').split('\x00')
         cli.display(f"New data on domain {domain_idx}", lvl='prod')
-        cli.display(f'\t{','.join([f'[{i}] {u}' for i,u in enumerate(cli.agent.users[domain_idx])])}', lvl='debug')
+        cli.display(f'{f'\n{' ' * 8}'.join([f'[{i}] {u}' for i,u in enumerate(cli.agent.users[domain_idx])])}', lvl='debug')
 
 
 

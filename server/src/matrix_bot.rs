@@ -136,6 +136,7 @@ impl MatrixBot {
                 let latest_control_msg = latest_control_msg.expect("Failed to unwrap an OK value (control_msg)");
                 match latest_control_msg {
                     MatrixBotControlMessage::RequestChannels { domain_idx } => {
+                        dbg!("RX ReqCh");
                         let mut idx = 0;
                         let mut channel_infos: Vec::<MatrixChannelInfo> = vec![];
                         for channel in self.channels.iter() {

@@ -101,33 +101,7 @@ async fn main() -> anyhow::Result<()> {
         // loop over all users, and within that all matrix channels to see if we have messages we need to send
         for (addr, mut user) in &mut users {
 
-            // check if we need to send out channel update to user
-            for i in 0..user.client_has_latest_channel_list.len() {
-                if (!&user.client_has_latest_channel_list[i]) {
-                    let updated_channel_data = &mut BitVec::<u8,Lsb0>::new();
-                    updated_channel_data.append(&mut BitVec::<u8,Lsb0>::from_element(i.try_into().expect("Failed to move domain_idx to u8 when sending update to client")));
-
-                    let n_channels: usize = (&user.matrix_bots[i].channel_infos).len();
-                    dbg!(n_channels);
-                    for j in 0..n_channels {
-                        let channel = &user.matrix_bots[i].channel_infos[j];
-                        let mut latest_ch_name_vec = BitVec::<u8,Lsb0>::from_vec(channel.display_name.as_bytes().to_vec());
-                        for channel_name_bit in latest_ch_name_vec.drain(0..latest_ch_name_vec.len()) {
-                            updated_channel_data.push(channel_name_bit);
-                        }
-                        if j < (n_channels - 1) {
-                            for _ in 0..8 {
-                                updated_channel_data.push(false);
-                            }
-                        }
-                        
-                    }
-                    dbg!("Send chUpdate");
-                    send_command(&mut user, command::CommandValue::ChannelUpdate as command::CommandInt, updated_channel_data, false); 
-                    user.client_has_latest_channel_list[i] = true;  // todo: some day add timeout to this
-                }
-            }
-
+        
             for i in 0..user.matrix_bot_channels.len() {
                 let channel = &user.matrix_bot_channels[i];
 
@@ -388,6 +362,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                         return;
                     }
                 };
+                sender.client_has_latest_channel_list[domain_idx as usize] = false;
                 &mbot_channel_ref.2.send(matrix_message::MatrixBotControlMessage::RequestChannels { domain_idx: domain_idx.try_into().expect("usize->u8 failed when sending reqch to mbot") });
              }
             command::CommandValue::RequestDomains => { 

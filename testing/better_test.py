@@ -214,7 +214,8 @@ class Cli:
                 self.agent.outstanding_mp_msgs[msg_id] = PartialMessage(msg_id)
             self.agent.outstanding_mp_msgs[msg_id].add_block(block_id, is_mp_first, is_command, actual_payload)
             if (self.agent.outstanding_mp_msgs[msg_id].is_complete()):
-                iscom, full_msg = self.agent.outstanding_mp_msgs[msg_id].get_full()                
+                iscom, full_msg = self.agent.outstanding_mp_msgs[msg_id].get_full()
+                del self.agent.outstanding_mp_msgs[msg_id]
                 self.receive_msg(iscom, full_msg)
 
         else:

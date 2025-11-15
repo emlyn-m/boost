@@ -211,6 +211,9 @@ async fn main() -> anyhow::Result<()> {
                 send_block_ack(sender, action_data, new_block_msgid);
                 process_message(sender, new_block_msgid, &bot_credentials);
             },
+            block::BlockReceivedAction::ProcessNoAck => {
+                process_message(sender, new_block_msgid, &bot_credentials);
+            }
             
         }
 

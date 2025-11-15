@@ -30,6 +30,7 @@ class Message:
         "SignOut": 14, 
         "ReqDomains": 15,
         "ChannelUpdate": 16,
+        "SignOutSuccess": 17,
     }
 
     NEEDS_ACK = {
@@ -49,6 +50,7 @@ class Message:
         "SignOut": 1,
         "ReqDomains": 0,
         "ChannelUpdate": 1,
+        "SignOutSuccess": 1,
     }
 
     OUTGOING_PATTERN_COM = "bool, bool, bool, u5, u8, hex"
@@ -202,10 +204,11 @@ class Cli:
         data_vals = bsdata.unpack(Message.INCOMING_PATTERN)
 
         payload = data_vals[4]
-        is_command = data_vals[2]
+        processableMsg = None
+
+        msg_id = data_vals[3]
 
         if data_vals[1]:
-            msg_id = data_vals[3]
             is_mp_first = data_vals[0]
             block_id = int(payload[:2], 16)
             actual_payload = payload[2:]
@@ -213,15 +216,27 @@ class Cli:
             if msg_id not in self.agent.outstanding_mp_msgs:
                 self.agent.outstanding_mp_msgs[msg_id] = PartialMessage(msg_id)
             self.agent.outstanding_mp_msgs[msg_id].add_block(block_id, is_mp_first, is_command, actual_payload)
+            self.agent.send_msg("BlockAck", f'{msg_id:0>2X}' + f'{block_id:0>2X}')
+
             if (self.agent.outstanding_mp_msgs[msg_id].is_complete()):
                 iscom, full_msg = self.agent.outstanding_mp_msgs[msg_id].get_full()
                 del self.agent.outstanding_mp_msgs[msg_id]
-                self.receive_msg(iscom, full_msg)
+
+                is_command = iscom
+                processableMsg = full_msg
+                command_id = int(payload[0], 16)
+
 
         else:
-            self.receive_msg(is_command, payload)
+            is_command = data_vals[2]
+            processableMsg = payload
+            command_id = int(payload[:2], 16)
+            if Message.NEEDS_ACK[Message.COMMANDS_REVERSE[command_id]]:
+                self.agent.send_msg("BlockAck", f'{msg_id:0>2X}' + '00')
 
-        # TODO: If needed, send BlockAck in response to incoming message
+        if processableMsg:
+            self.receive_msg(is_command, processableMsg)
+
 
 
     def receive_msg(self, is_command, payload):
@@ -259,6 +274,9 @@ class Cli:
 
             elif Message.COMMANDS_REVERSE[command_type] == "ChannelUpdate":
                 ResponseCommandHandler.recvhandle_chupdate(self, payload)
+
+            elif Message.COMMANDS_REVERSE[command_type] == "SignOutSuccess":
+                ResponseCommandHandler.recvhandle_signoutsucc(self, payload)
 
 
     def user_input(self):
@@ -299,6 +317,9 @@ class ResponseCommandHandler:
         cli.agent.users[domain_idx] = bytes.fromhex(dat[2:]).decode('utf-8').split('\x00')
         cli.display(f"New data on domain {domain_idx}", lvl='prod')
         cli.display(f'{f'\n{' ' * 8}'.join([f'[{i}] {u}' for i,u in enumerate(cli.agent.users[domain_idx])])}', lvl='debug')
+
+    def recvhandle_signoutsucc(cli, dat):
+        cli.display("Sighoutsucc unimpl", lvl='warn')
 
 
 

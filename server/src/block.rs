@@ -14,6 +14,8 @@ pub const BLOCK_MPIDX_RANGE: Range<usize> = 8..16;
 pub const BLOCK_PAYLD_RANGE: Range<usize> = 8..1120;
 pub const BLOCK_MPPAY_RANGE: Range<usize> = 16..1120;
 
+pub const BLOCK_SPCOM_RANGE: Range<usize> = 8..16;
+
 pub const NON_MP_OCTETS: u8 = 138;
 
 
@@ -52,4 +54,5 @@ pub enum BlockReceivedAction {
     SendBlockAck, // Ordinary, multipart block received
     ProcessMessage, // Received singlepart block / all of multipart block
     BlockInvalid, // General invalid type
+    ProcessNoAck, // Eg: Received BlockAck
 }

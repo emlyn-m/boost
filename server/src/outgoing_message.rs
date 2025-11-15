@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::time;
 
 
-pub const OUTGOING_REFRESH_TIME_MS: u128 = 1*1000;  // every 1 seconds
+pub const OUTGOING_REFRESH_TIME_MS: u128 = 5*1000;  // every 5 seconds
 pub const MAX_SEND_RETRIES: u32 = 5;
 
 pub struct OutgoingMessage {

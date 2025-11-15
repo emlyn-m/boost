@@ -9,6 +9,7 @@ use crate::matrix_message::{
 };
 use crate::randchar::generate_random_str;
 use crate::sms;
+use crate::command;
 
 use bitvec::prelude::*;
 use x25519_dalek;
@@ -106,10 +107,18 @@ impl User {
         let is_multipart = new_block.data.get(block::BLOCK_ISMLP_RANGE).unwrap().load::<u8>() == 1;
         let block_idx = if is_multipart { new_block.data.get(block::BLOCK_MPIDX_RANGE).unwrap().load::<u8>() } else { 0 };
         
-        
 
         if !self.messages.contains_key(&msg_id) {  // todo: some way to clear these messages
             self.messages.insert(msg_id, message::Message::new(new_block));
+
+            if (!is_multipart) {
+                // Check if this block is a BlockAck
+                let block_command = new_block.data.get(block::BLOCK_SPCOM_RANGE).unwrap().load::<u8>();
+                if (block_command == command::CommandValue::BlockAck as command::CommandInt) {
+                    return (block::BlockReceivedAction::ProcessNoAck, block_idx);
+                }
+            }
+            
         } else {
             if !is_multipart {
                 // single part message - already received

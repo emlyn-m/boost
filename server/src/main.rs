@@ -393,7 +393,9 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                 let bot_index: usize = actual_payload[0].try_into().expect("u8 to usize conversion failed somehow");
                 match sender.revoke_bot(bot_index) {
                     Ok(()) => {
-                        send_command(sender, command::CommandValue::SignOutSuccess as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], true);
+                        let mut payload: BitVec::<u8,Lsb0> = bitvec![u8, Lsb0; 0; 8];
+                        payload[0..8].store::<u8>(bot_index.try_into().expect("u8->usize fail"));
+                        send_command(sender, command::CommandValue::SignOutSuccess as command::CommandInt, &mut payload, true);
                     },
                     Err(()) => {
                         send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false);

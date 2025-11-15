@@ -276,7 +276,7 @@ class Cli:
                 ResponseCommandHandler.recvhandle_chupdate(self, payload)
 
             elif Message.COMMANDS_REVERSE[command_type] == "SignOutSuccess":
-                ResponseCommandHandler.recvhandle_signoutsucc(self, payload)
+                ResponseCommandHandler.recvhandle_signoutsuccess(self, payload)
 
 
     def user_input(self):
@@ -318,8 +318,10 @@ class ResponseCommandHandler:
         cli.display(f"New data on domain {domain_idx}", lvl='prod')
         cli.display(f'{f'\n{' ' * 8}'.join([f'[{i}] {u}' for i,u in enumerate(cli.agent.users[domain_idx])])}', lvl='debug')
 
-    def recvhandle_signoutsucc(cli, dat):
-        cli.display("Sighoutsucc unimpl", lvl='warn')
+    def recvhandle_signoutsuccess(cli, dat):
+        domain_idx = int(dat[:2], 16)
+        cli.agent.domains[domain_idx] = None
+        cli.display(f"Signed out of domain {domain_idx}", lvl='prod')
 
 
 

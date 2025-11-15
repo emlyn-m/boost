@@ -7,6 +7,7 @@ mod credential_manager;
 mod matrix_bot;
 mod matrix_message;
 mod randchar;
+mod sms;
 
 use bitvec::prelude::*;
 use std::collections::HashMap;
@@ -101,6 +102,9 @@ async fn main() -> anyhow::Result<()> {
         // loop over all users, and within that all matrix channels to see if we have messages we need to send
         for (addr, mut user) in &mut users {
 
+
+            // refresh users outgoing messages
+            &user.refresh_outgoing();
         
             for i in 0..user.matrix_bot_channels.len() {
                 let channel = &user.matrix_bot_channels[i];
@@ -134,7 +138,7 @@ async fn main() -> anyhow::Result<()> {
 
         for pending_ctrl in pending_control_msgs.drain(..) {
 
-            match (pending_ctrl.1) {
+            match pending_ctrl.1 {
                 matrix_message::MatrixBotControlMessage::UpdateChannels{ domain_idx, channels } => {
 
                     let mut requesting_user = match users.get_mut(&pending_ctrl.0) {
@@ -367,6 +371,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                 &mbot_channel_ref.2.send(matrix_message::MatrixBotControlMessage::RequestChannels { domain_idx: domain_idx.try_into().expect("usize->u8 failed when sending reqch to mbot") });
              }
             command::CommandValue::RequestDomains => { 
+                // todo: actual implementation
                 send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Unimplemented".as_bytes().to_vec()), false);
              }
             command::CommandValue::BlockAck => { 
@@ -384,7 +389,9 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
             command::CommandValue::SignOut => {
                 let bot_index: usize = actual_payload[0].try_into().expect("u8 to usize conversion failed somehow");
                 match sender.revoke_bot(bot_index) {
-                    Ok(()) => {},
+                    Ok(()) => {
+                        send_command(sender, command::CommandValue::SignOutSuccess as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], true);
+                    },
                     Err(()) => {
                         send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false);
                     }

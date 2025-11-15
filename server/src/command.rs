@@ -16,6 +16,7 @@ pub enum CommandValue {
     AuthenticationResult = 12, // Response to AuthenticateToAccount, contains NULL if unsuccessful, and 0x01 followed by the domain_idx if successful
     RequestKnownUsers = 7, // Request last N users on a given domain
     SignOut = 14, // Deauthenticate the sender from a given bot (send bot_idx)
+    SignOutSuccess = 17,
     RevokeAllClients = 13, // Revoke _all_ boost clients authentication with a given bot (requires authentication with the bot obv) (send bot address)
     RequestDomains = 15, // TODO: Do we have a response to this
     ChannelUpdate = 16, // response to RequestKnownUsers

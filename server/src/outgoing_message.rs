@@ -2,10 +2,16 @@ use crate::block;
 
 use bitvec::prelude::*;
 use std::collections::HashMap;
+use std::time;
 
+
+pub const OUTGOING_REFRESH_TIME_MS: u128 = 1*1000;  // every 1 seconds
+pub const MAX_SEND_RETRIES: u32 = 5;
 
 pub struct OutgoingMessage {
     pub stored_blocks: HashMap<u8, BitVec::<u8,Lsb0>>,
+    pub last_send_instant: std::time::Instant,
+    pub send_attempts: u32,
 }
 
 impl OutgoingMessage {
@@ -19,7 +25,9 @@ impl OutgoingMessage {
         }
 
         let new_outgoing = OutgoingMessage {
-            stored_blocks
+            stored_blocks,
+            last_send_instant: std::time::Instant::now(),
+            send_attempts: 1,
         };
 
         new_outgoing        

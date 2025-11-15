@@ -103,6 +103,7 @@ impl MatrixBot {
         // todo: setup more listeners
 
 
+        // create event handlers
         for i in 0..self.channels.len() {
             let room_tx_channel = self.internal_channels.0.clone();
     
@@ -113,7 +114,7 @@ impl MatrixBot {
 
                 let content = match ev {
                     SyncRoomMessageEvent::Original(msg) => msg.content.body().to_string(),
-                    SyncRoomMessageEvent::Redacted(msg) => {println!("todo: Handle redacted events");return}
+                    SyncRoomMessageEvent::Redacted(msg) => { dbg!("todo: Handle redacted events"); return }
                 };
                 
                 let channel_msg = MatrixMessage {
@@ -128,6 +129,7 @@ impl MatrixBot {
     
 
 
+        // main loop
         loop {
             // poll for command channel messages
             let latest_control_msg = self.internal_channels.3.try_recv();
@@ -147,6 +149,10 @@ impl MatrixBot {
                         self.internal_channels.2.send(
                             MatrixBotControlMessage::UpdateChannels{ domain_idx: domain_idx, channels: channel_infos }
                         );
+                    }
+
+                    MatrixBotControlMessage::TerminateBot => {
+                        return;
                     }
                     _ => { dbg!("Unimpl control msg"); }  // unimplemented
                 }

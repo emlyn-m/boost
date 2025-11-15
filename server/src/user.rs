@@ -8,6 +8,7 @@ use crate::matrix_message::{
     MatrixMessage, MatrixBotControlMessage
 };
 use crate::randchar::generate_random_str;
+use crate::sms;
 
 use bitvec::prelude::*;
 use x25519_dalek;
@@ -65,6 +66,29 @@ impl User {
 
 
         new_user
+    }
+
+    pub fn refresh_outgoing(&mut self) {
+        let mut failed_outgoing: Vec::<u8> = vec![];
+        for (outgoing_id, outgoing_msg) in &mut self.outgoing_messages {
+            let currentTime = std::time::Instant::now();
+            if (currentTime.duration_since(outgoing_msg.last_send_instant).as_millis()) > outgoing_message::OUTGOING_REFRESH_TIME_MS {
+                // should attempt to resend the whole message
+                outgoing_msg.last_send_instant = std::time::Instant::now();
+                outgoing_msg.send_attempts += 1;
+                if (outgoing_msg.send_attempts > outgoing_message::MAX_SEND_RETRIES) {
+                    failed_outgoing.push(*outgoing_id);
+                }
+                dbg!("Unresponded to outgoing msg");
+                for (block_id, block) in &outgoing_msg.stored_blocks {
+                    sms::send_block(&self.address.as_str(), outgoing_id, block_id, block);
+                }
+            }
+        }
+
+        for failed_outgoing_id in failed_outgoing {
+            self.outgoing_messages.remove(&failed_outgoing_id);
+        }
     }
 
     pub fn decrypt_block(&self, block: &mut block::Block) {
@@ -162,18 +186,7 @@ impl User {
 
         // DEBUG CODE BELOW - REPLACE WHEN HARDWARE AVAILABLE
         for i in 0..num_blocks {
-            let mut outfile_path: String = "".to_string();
-            outfile_path += crate::SHAREDMEM_OUTPUT;
-            outfile_path += "/";
-            outfile_path += self.address.as_str();
-            outfile_path += "-";
-            outfile_path += new_msg_id.to_string().as_str();
-            outfile_path += "-";
-            outfile_path += i.to_string().as_str();
-            outfile_path += "-";
-            outfile_path += generate_random_str(10).as_str();
-            let mut outfile = std::fs::File::create(outfile_path.clone()).expect(&format!("Failed to open sharedmem output: {}", &outfile_path.as_str()).as_str());  // this is panicking on mp messages
-            let _ = outfile.write(&(output_blocks[i].as_raw_slice()));
+            sms::send_block(self.address.as_str(), &new_msg_id, &i.try_into().expect("blockid fail in user.send"), &output_blocks[i]);
         }
 
     }
@@ -300,9 +313,12 @@ impl User {
             return Err(());
         }
 
+        // send kill signal
+        self.matrix_bot_channels.get(bot_index).unwrap().2.send(MatrixBotControlMessage::TerminateBot);
+
         self.client_has_latest_channel_list.remove(bot_index);
+        self.matrix_bot_channels.remove(bot_index);
         self.matrix_bots.remove(bot_index);
-        //todo:  also remove channels and kill thread
 
         Ok(())
     }

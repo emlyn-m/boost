@@ -53,8 +53,8 @@ impl User {
             client,
             matrix_bots: vec![],
             matrix_bot_channels: vec![],
-            client_has_latest_channel_list: vec![],
-            client_has_latest_domain_info: false,  // totally unsure what the diff between channel info and domain_info
+            client_has_latest_channel_list: vec![], // channel info: list of users on a given platform
+            client_has_latest_domain_info: false,  // domain info: list of platforms
         };
 
         for i in 1<<4..1<<5 {
@@ -85,9 +85,6 @@ impl User {
         if !self.messages.contains_key(&msg_id) {
             self.messages.insert(msg_id, message::Message::new(new_block));
         } else {
-            // block may have already been received
-            // todo: depends how we void already used blocks, potentially a timer??
-
             if !is_multipart {
                 // single part message - already received
                 return (block::BlockReceivedAction::SendBlockAck, 0);
@@ -259,7 +256,7 @@ impl User {
         });
         
 
-        here_control_tx.send(MatrixBotControlMessage::RequestChannels);
+        here_control_tx.send(MatrixBotControlMessage::RequestChannels { domain_idx: self.matrix_bots.len().try_into().expect("Failed to case usize to u8") } );
 
         let mut recv_matrix_channel_infos = match here_control_rx.recv() {
             Ok(data) => data,
@@ -268,7 +265,7 @@ impl User {
 
 
         let matrix_channel_infos = match recv_matrix_channel_infos {
-            MatrixBotControlMessage::UpdateChannels{ channels } => channels,
+            MatrixBotControlMessage::UpdateChannels{ channels, .. } => channels,
             _ => panic!("First message received from mbot on control channel was not of type MatrixBotControlMessage::UpdateChannels")
         }; // blocking recv
         dbg!("Received channel info");

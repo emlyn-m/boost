@@ -27,7 +27,6 @@ pub enum CommandValue {
     // general
     Error = 8,
     InvalidCommand = 9,
-    DuplicateBlock = 10, // not strictly for blocks but single-part messages dont have idempotency tokens
     BlockAck = 11,
 }
 

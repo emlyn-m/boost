@@ -8,6 +8,6 @@ pub struct MatrixMessage {
 
 
 pub enum MatrixBotControlMessage {
-    RequestChannels,
-    UpdateChannels { channels: Vec::<matrix_bot::MatrixChannelInfo> },
+    RequestChannels { domain_idx: u8 },
+    UpdateChannels { domain_idx: u8, channels: Vec::<matrix_bot::MatrixChannelInfo> },
 }

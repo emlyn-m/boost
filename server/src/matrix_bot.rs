@@ -11,8 +11,8 @@ use crate::matrix_message::MatrixMessage;
 use crate::matrix_message::MatrixBotControlMessage;
 
 pub struct MatrixBotChannels(
-    pub Sender::<MatrixMessage>, pub Receiver::<MatrixMessage>,
-    pub Sender::<MatrixBotControlMessage>, pub Receiver::<MatrixBotControlMessage>
+    pub Sender::<MatrixMessage>, pub Receiver::<MatrixMessage>,  // TX/RX for actual messages
+    pub Sender::<MatrixBotControlMessage>, pub Receiver::<MatrixBotControlMessage> // TX/RX for control messages
 ); // these do NOT form a typical channel pair, eg 0 does not send to 1
 
 
@@ -135,7 +135,7 @@ impl MatrixBot {
             if latest_control_msg.is_ok() {
                 let latest_control_msg = latest_control_msg.expect("Failed to unwrap an OK value (control_msg)");
                 match latest_control_msg {
-                    MatrixBotControlMessage::RequestChannels => {
+                    MatrixBotControlMessage::RequestChannels { domain_idx } => {
                         let mut idx = 0;
                         let mut channel_infos: Vec::<MatrixChannelInfo> = vec![];
                         for channel in self.channels.iter() {
@@ -144,10 +144,10 @@ impl MatrixBot {
                         }
 
                         self.internal_channels.2.send(
-                            MatrixBotControlMessage::UpdateChannels{ channels: channel_infos }
+                            MatrixBotControlMessage::UpdateChannels{ domain_idx: domain_idx, channels: channel_infos }
                         );
                     }
-                    _ => {  }  // unimplemented
+                    _ => { dbg!("Unimpl control msg"); }  // unimplemented
                 }
             }
             
@@ -162,7 +162,6 @@ impl MatrixBot {
             }
         }
 
-        // lastly, we need some way to check for matrix messages that we need to send out via sms
     }
 
 }

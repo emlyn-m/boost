@@ -19,7 +19,9 @@ use std::io::Write;
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::Arc;
+use std::time;
 
+const MESSAGE_KEEPFOR_DURATION_MS: u128 = 10*1000;  // Tunable!! 10s is proooobably too low but good for testing :p
 
 pub struct User {
     pub address: String,
@@ -82,18 +84,23 @@ impl User {
         
         
 
-        if !self.messages.contains_key(&msg_id) {
+        if !self.messages.contains_key(&msg_id) {  // todo: some way to clear these messages
             self.messages.insert(msg_id, message::Message::new(new_block));
         } else {
             if !is_multipart {
                 // single part message - already received
-                return (block::BlockReceivedAction::SendBlockAck, 0);
+                let currentTime = std::time::Instant::now();
+                if (currentTime.duration_since(self.messages.get(&msg_id).expect("msg_id should! be present for fetching time").received_at)).as_millis() > MESSAGE_KEEPFOR_DURATION_MS {
+                    self.messages.remove(&msg_id);  // Old message, no need to keep
+                } else {
+                    return (block::BlockReceivedAction::SendBlockAck, 0);
+                }
             } else if self.messages.get(&msg_id).unwrap().stored_blocks.contains(&block_idx) {
                 // multipart message - this block already received
                 return (block::BlockReceivedAction::SendBlockAck, block_idx);
             }
 
-            self.messages.get_mut(&msg_id).expect("could not retrieve message to insert new block in user::receive_block").add_block(new_block); // this is never called on single part msgs bc those will be caught by the if block (line 58)
+            self.messages.get_mut(&msg_id).expect("could not retrieve message to insert new block in user::receive_block").add_block(new_block);
         }
         
 

@@ -2,6 +2,7 @@ use crate::block;
 
 use bitvec::prelude::*;
 use std::collections::BTreeSet;
+use std::time;
 
 pub struct Message {
     pub msg_id: u8, // actually only 5 bits
@@ -13,6 +14,8 @@ pub struct Message {
     pub payload: BitVec<u8, Lsb0>,
 
     pub is_complete: bool,
+
+    pub received_at: std::time::Instant,
 }
 
 impl Message {
@@ -29,6 +32,7 @@ impl Message {
             stored_blocks: BTreeSet::new(),
             payload: bitvec![u8, Lsb0;],
             is_complete: !is_multipart,
+            received_at: std::time::Instant::now(),
         };
 
         new_msg.stored_blocks.insert(new_msg.msg_id);

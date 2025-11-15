@@ -242,6 +242,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
         let actual_payload = msg.payload.clone().split_off(8); // remove the command id from the message 
         match command_type {
             command::CommandValue::DhkeInit => { 
+                dbg!("RX DhkeInit");
                 // revoke all of our authorizations on that sender
                 for i in 0..sender.matrix_bots.len() {
                     let _ = sender.revoke_bot(i);

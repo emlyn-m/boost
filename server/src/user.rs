@@ -125,9 +125,8 @@ impl User {
                 let currentTime = std::time::Instant::now();
                 if (currentTime.duration_since(self.messages.get(&msg_id).expect("msg_id should! be present for fetching time").received_at)).as_millis() > MESSAGE_KEEPFOR_DURATION_MS {
                     self.messages.remove(&msg_id);  // Old message, no need to keep
-                } else {
-                    return (block::BlockReceivedAction::SendBlockAck, 0);
                 }
+                return (block::BlockReceivedAction::SendBlockAck, 0);
             } else if self.messages.get(&msg_id).unwrap().stored_blocks.contains(&block_idx) {
                 // multipart message - this block already received
                 return (block::BlockReceivedAction::SendBlockAck, block_idx);
@@ -303,6 +302,7 @@ impl User {
         let new_bot_info = matrix_bot::MatrixBotInfo {
             bot_address: botcred.bot_address.clone(),
             platform: botcred.service_name.clone(),
+            bot_client_name: format!("{name}@{sname}", name=botcred.username.clone(), sname=botcred.service_name.clone()),
             num_channels: matrix_channel_infos.len(),
             channel_infos: matrix_channel_infos,
         };

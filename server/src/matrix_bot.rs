@@ -19,6 +19,7 @@ pub struct MatrixBotChannels(
 pub struct MatrixBotInfo {
     pub bot_address: String,
     pub platform: String,
+    pub bot_client_name: String, // name used by client
     pub num_channels: usize,
     pub channel_infos: Vec::<MatrixChannelInfo>,
 }

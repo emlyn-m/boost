@@ -372,11 +372,25 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                 };
                 sender.client_has_latest_channel_list[domain_idx as usize] = false;
                 &mbot_channel_ref.2.send(matrix_message::MatrixBotControlMessage::RequestChannels { domain_idx: domain_idx.try_into().expect("usize->u8 failed when sending reqch to mbot") });
-             }
+            }
+
             command::CommandValue::RequestDomains => { 
-                // todo: actual implementation
-                send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Unimplemented".as_bytes().to_vec()), false);
+
+                let mut payload= bitvec![u8, Lsb0;];
+                for i in 0..(sender.matrix_bots.len()) {
+                    let mut latest_domain_name = BitVec::<u8,Lsb0>::from_vec(sender.matrix_bots.get(i).expect("oobe matrix bots").bot_client_name.as_bytes().to_vec());
+                    for domain_name_bit in latest_domain_name.drain(..) {
+                        payload.push(domain_name_bit);
+                    }
+
+                    if (i+1 != sender.matrix_bots.len()) {
+                        for j in 0..8 { payload.push(false); }
+                    }
+                }
+
+                send_command(sender, command::CommandValue::DomainUpdate as command::CommandInt, &mut payload, false);
              }
+
             command::CommandValue::BlockAck => { 
                 let block_ack_send_result = sender.process_block_ack(&actual_payload); 
                 match block_ack_send_result {
@@ -389,6 +403,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                     }
                 }
             }
+            
             command::CommandValue::SignOut => {
                 let bot_index: usize = actual_payload[0].try_into().expect("u8 to usize conversion failed somehow");
                 match sender.revoke_bot(bot_index) {
@@ -402,12 +417,13 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                     }
                 };
             }
+
             command::CommandValue::RevokeAllClients => {
                 dbg!("Reveived revokeallclients");
                 // todo: implement
-
-                
+                send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Unimplemented".as_bytes().to_vec()), false);
             }
+
             _ => { send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Unknown Command".as_bytes().to_vec()), false); }
         }
 

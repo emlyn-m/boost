@@ -31,6 +31,7 @@ class Message:
         "ReqDomains": 15,
         "ChannelUpdate": 16,
         "SignOutSuccess": 17,
+        "DomainUpdate": 18,
     }
 
     NEEDS_ACK = {
@@ -51,6 +52,7 @@ class Message:
         "ReqDomains": 0,
         "ChannelUpdate": 1,
         "SignOutSuccess": 1,
+        "DomainUpdate": 1,
     }
 
     OUTGOING_PATTERN_COM = "bool, bool, bool, u5, u8, hex"
@@ -278,6 +280,9 @@ class Cli:
             elif Message.COMMANDS_REVERSE[command_type] == "SignOutSuccess":
                 ResponseCommandHandler.recvhandle_signoutsuccess(self, payload)
 
+            elif Message.COMMANDS_REVERSE[command_type] == "DomainUpdate":
+                ResponseCommandHandler.recvhandle_domainupdate(self, payload)
+
 
     def user_input(self):
         command = input(strings.COMMAND_INPUT)
@@ -316,12 +321,23 @@ class ResponseCommandHandler:
         domain_idx  = int(dat[:2], 16)
         cli.agent.users[domain_idx] = bytes.fromhex(dat[2:]).decode('utf-8').split('\x00')
         cli.display(f"New data on domain {domain_idx}", lvl='prod')
-        cli.display(f'{f'\n{' ' * 8}'.join([f'[{i}] {u}' for i,u in enumerate(cli.agent.users[domain_idx])])}', lvl='debug')
+        cli.display(f'{f'\n{' ' * 8}'.join([f'[{i}] {u}' for i,u in enumerate(cli.agent.users[domain_idx])])}', lvl='prod')
 
     def recvhandle_signoutsuccess(cli, dat):
         domain_idx = int(dat[:2], 16)
         cli.agent.domains[domain_idx] = None
         cli.display(f"Signed out of domain {domain_idx}", lvl='prod')
+
+    def recvhandle_domainupdate(cli, dat):
+        newDomains = dat.split('\x00')
+
+        for i in range(len(cli.agent.domains)):
+            cli.agent.domains[i] = None
+            if i in range(len(newDomains)):
+                cli.agent.domains[i] = bytes.fromhex(newDomains[i]).decode('utf-8')
+
+        cli.display(f'Updated domain list:', lvl='prod')
+        cli.display(f'{f'\n{' ' * 8}'.join([f'[{i}]: {u}' for i,u in enumerate(cli.agent.domains) if u != None])}', lvl='debug')
 
 
 

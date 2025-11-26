@@ -19,11 +19,11 @@
 | Multiple numbers | ✅ |
 | Arbitrary matrix bots | ✅ | |
 | Non-text messages | ❌ | planned |
-| Encryption | ❌ | Key exchange supported, encryption in the works! |
+| Encryption | ❌ | Key exchange supported, encryption in the works! | |
 | Sending messages | ✅ ||
 | Receiving messages | ✅ ||
 | Refreshing user list | ✅ ||
-| Messaging unknown external user | 
+| Messaging unknown external user | ❌ | planned | 
 
 ## Installation / Configuration
 

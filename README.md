@@ -180,29 +180,29 @@ password=plaintext
 | `flag_mp_first` | 0x02 | 0x03 | 1 | Yes ||
 | `msg_id` | 0x03 | 0x08 | 5 | Yes ||
 
-### `[INCOMPLETE] command_id`
+### `command_id`
 | Name | Value (Hex) | Requires Ack | `command_data` | Notes
 |--|--|--|--|--|
 |`block_ack`| `0x0b` | No | `[0x00-0x08] block id` |  |
 |`dhke_init`| `0x01` | No | `[0x00-0xff] x25519 client public` |  |
 |`auth_to_account`| `0x04` | Yes | `[0x00-varies] credfile.cfg:service_name` `[] 0x00` `[varies-varies] credfile.cfg:username` `[] 0x00` `[varies-varies] credfile.cfg:password` `[] 0x00`|  |
-|`auth_result`| `0x0c` | No | | response to `auth_to_account` |
+|`auth_result`| `0x0c` | No | `[0x00-0x08] status_res (normal=1)` `[0x08-0x16] original msg_id` `[0x16-0x24] new domain_id` | response to `auth_to_account` |
 |`req_domains`| `0x0f` | No |  |  |
 |`domain_update`| `0x12` | Yes | `[0x00-varies] name for domain_id=0` `[] 0x00` `[varies-varies] name for domain_id=1` `[] 0x00` `...` | response to `req_domains` |
-|`req_known_users`| `0x07` | No |  |  |
+|`req_known_users`| `0x07` | No | `[0x00-0x08] domain_id` |  |
 |`channel_update`| `0x10` | Yes | `[0x00-0x08] domain_id` `[varies-varies] name for user_id=0 on domain_id` `[] 0x00` `[varies-varies] name for user_id=1 on domain_id` `[] 0x00` `...`| response to `req_known_users` |
-|`find_user`| `0x13`|No| |
-|`user_found`|`0x14`|No||response to `find_user`|
-|`revoke_all_clients`| `0x0d` | Yes |  |  |
+|`find_user`| `0x13`|No|`[⚠️unimpl]`|
+|`user_found`|`0x14`|No|`[⚠️unimpl]`| response to `find_user`|
+|`revoke_all_clients`| `0x0d` | Yes | `[⚠️unimpl]` |  |
 |`sign_out`| `0x0e` | Yes | `[0x00-0x08] domain_id to sign out of` |  |
-|`signout_success`| `0x11` | Yes |  | require client ACK as this may change the mapping of `domain_id`s |
+|`signout_success`| `0x11` | Yes | `[0x00-0x08] domain_id signed out of`  | require client ACK as this may change the mapping of `domain_id`s |
 |||||
-|`error`| `0x08` | No | `[0x00-varies] error message (utf8)` |  |
-|`invalid_command`| `0x09` | No |  |  |
-|`duplicate_block`| `0x0a` | No |  | client has sent this block before, generally equivalent to `block_ack` |
+|`error`| `0x08` | No | `[0x00-0x08] msg_id of cause` `[0x08-varies] error message (utf8)` |  |
+|`invalid_command`| `0x09` | No | `[0x00-0x08] msg_id of cause` `[0x08-varies] error message (utf8)` |  |
+|`duplicate_block`| `0x0a` | No | `[⚠️unimpl]` | client has sent this block before, generally equivalent to `block_ack` |
 |`unencrypted`| `0x03` | No |  | client MUST encrypt with `dhke_init` before taking any other actions |
-|`unknown_domain`| `0x05` | No |  | response to `req_known_users` |
-|`target_user_not_found`| `0x06` | No |  | response to `auth_to_account`, `find_user` |
+|`unknown_domain`| `0x05` | No | `[⚠️unimpl]` | response to `req_known_users` |
+|`target_user_not_found`| `0x06` | No | `[0x00-0x08] msg_id of cause` `[0x08-varies] error message (utf8)` | response to `auth_to_account`, `find_user` |
 
 
 ### `head_data`

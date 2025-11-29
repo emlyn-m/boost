@@ -1,4 +1,4 @@
-![](https://github.com/emlyn-m/boost/actions/workflows/rust.yml/badge.svg)
+[![Rust](https://github.com/emlyn-m/boost/actions/workflows/rust.yml/badge.svg)](https://github.com/emlyn-m/boost/actions/workflows/rust.yml)
 # boost-sms
 
 <div align="center"><img align="center" src="assets/logo.png" /></div>
@@ -210,6 +210,7 @@ password=plaintext
 |--|--|--|--|--|--|
 |`user_id`| 0x00 | 0x08 | 8 | Yes | |
 |`domain_id` | 0x08 | 0x16 | 8 | Yes ||
+
 
 
 

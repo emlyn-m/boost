@@ -1,5 +1,5 @@
 mod block;
-mod user;
+pub mod user;
 mod message;
 mod command;
 mod outgoing_message;

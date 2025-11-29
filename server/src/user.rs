@@ -144,7 +144,7 @@ impl User {
                 
     }
 
-    fn generate_msg_blocks(&mut self, new_message: &BitVec::<u8,Lsb0>, is_command: bool, new_msg_id: u8) -> Vec::<BitVec::<u8,Lsb0>> {
+    fn generate_msg_blocks(new_message: &BitVec::<u8,Lsb0>, is_command: bool, new_msg_id: u8) -> Vec::<BitVec::<u8,Lsb0>> {
         let payload_size: usize = 140;
 
         // header size: 1 octet singlepart, 2 octets multipart
@@ -190,7 +190,7 @@ impl User {
             self.unused_ids.push(new_msg_id);
         }
 
-        let mut output_blocks = self.generate_msg_blocks(&new_message, is_command, new_msg_id);
+        let mut output_blocks = User::generate_msg_blocks(&new_message, is_command, new_msg_id);
         let num_blocks = output_blocks.len();
 
         if self.is_encrypted {

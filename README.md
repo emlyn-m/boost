@@ -15,9 +15,9 @@
 ## Features
 |  | Supported? | Notes
 | -- |:--:| -- |
-| Multiple accounts | ✅ |
-| Multiple numbers | ✅ |
-| Arbitrary matrix bots | ✅ | |
+| Multiple accounts | ✅ | Up to 256 |
+| Multiple numbers | ✅ ||
+| Arbitrary matrix bots | ✅ |Currently only [mautrix-discord](https://github.com/mautrix/discord) tested|
 | Non-text messages | ❌ | planned |
 | Encryption | ❌ | Key exchange supported, encryption in the works! | |
 | Sending messages | ✅ ||
@@ -210,3 +210,4 @@ password=plaintext
 |--|--|--|--|--|--|
 |`user_id`| 0x00 | 0x08 | 8 | Yes | |
 |`domain_id` | 0x08 | 0x16 | 8 | Yes ||
+

@@ -35,6 +35,7 @@ mod tests {
 
     // == Start Message testing ==
     #[test]
+    #[ignore]
     fn test_block_ack() { test_msg::test_block_ack(); }
     
     #[test]

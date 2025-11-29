@@ -8,7 +8,7 @@ use std::fs;
 use regex::Regex;
 use bcrypt;
 
-const SUPPORTED_PLATFORMS: &[&str] = &["discord", "instagram", "fb_messenger"];
+const SUPPORTED_PLATFORMS: &[&str] = &["discord", "instagram", "fb_messenger", "test_platform"];
 
 pub struct HomeserverCredentials {
     pub address: String,

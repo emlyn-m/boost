@@ -18,7 +18,7 @@ pub const BLOCK_SPCOM_RANGE: Range<usize> = 8..16;
 
 pub const NON_MP_OCTETS: u8 = 138;
 
-
+#[derive(Clone)]
 pub struct Block {
     pub addr: String,
     pub data: BitVec<u8, Lsb0>,

@@ -14,18 +14,22 @@ pub struct OutgoingMessage {
     pub msg_type: command::CommandInt,
     pub ack_data: u8,
 
-    pub stored_blocks: HashMap<u8, BitVec::<u8,Lsb0>>,
+    pub stored_blocks: HashMap<u8, block::Block>,
     pub last_send_instant: std::time::Instant,
     pub send_attempts: u32,
 }
 
 impl OutgoingMessage {
-    pub fn new(msg_type: command::CommandInt, ack_data: u8, blocks: &Vec::<BitVec::<u8,Lsb0>>) -> OutgoingMessage {
+    pub fn new(msg_type: command::CommandInt, ack_data: u8, blocks: &Vec::<block::Block>) -> OutgoingMessage {
 
         let num_blocks = blocks.len();
         let mut stored_blocks = HashMap::new();
         for i in 0..num_blocks {
-            let block_idx = if blocks[i].get(block::BLOCK_ISMLP_RANGE).unwrap().load::<u8>() == 1 { blocks[i].get(block::BLOCK_MPIDX_RANGE).unwrap().load::<u8>() } else { 0 };
+            let block_idx = if blocks[i].data.get(block::BLOCK_ISMLP_RANGE).unwrap().load::<u8>() == 1 { 
+                blocks[i].data.get(block::BLOCK_MPIDX_RANGE).unwrap().load::<u8>() 
+            } else { 
+                0 
+            };
             stored_blocks.insert(block_idx, blocks[i].clone());
         }
 

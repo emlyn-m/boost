@@ -1,4 +1,4 @@
-mod block;
+pub mod block;
 pub mod user;
 mod message;
 mod command;
@@ -192,7 +192,7 @@ pub async fn run() -> anyhow::Result<()> {
 
 
         if sender.is_encrypted {
-            sender.decrypt_block(&mut new_block);
+            sender.decrypt_block(&new_block);
         }
 
         let (action, action_data) = sender.receive_block(&mut new_block);

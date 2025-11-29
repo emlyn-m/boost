@@ -92,11 +92,16 @@ impl User {
         }
     }
 
-    pub fn decrypt_block(&self, _block: &mut block::Block) {
-        
+    pub fn encrypt_block(&self, block: &block::Block) -> block::Block {
+        // todo: user::decrypt_block
+        return block.clone();
+    }
+
+    pub fn decrypt_block(&self, block: &block::Block) -> block::Block {
+        // todo: user::decrypt_block
         // let _chain_key = block.data.drain(0..8).collect::<BitVec>().load::<u8>(); // pull first octet (chain index)
         
-        // todo: actually decrypt the damn message
+        return block.clone();
         
     }
 
@@ -108,7 +113,7 @@ impl User {
         let block_idx = if is_multipart { new_block.data.get(block::BLOCK_MPIDX_RANGE).unwrap().load::<u8>() } else { 0 };
         
 
-        if !self.messages.contains_key(&msg_id) {  // todo: some way to clear these messages
+        if !self.messages.contains_key(&msg_id) {
             self.messages.insert(msg_id, message::Message::new(new_block));
 
             if !is_multipart {
@@ -144,12 +149,12 @@ impl User {
                 
     }
 
-    pub fn generate_msg_blocks(new_message: &BitVec::<u8,Lsb0>, is_command: bool, new_msg_id: u8) -> Vec::<BitVec::<u8,Lsb0>> {
+    pub fn generate_msg_blocks(new_message: &BitVec::<u8,Lsb0>, is_command: bool, new_msg_id: u8, addr: &String) -> Vec::<block::Block> {
         let payload_size: usize = 140;
 
         // header size: 1 octet singlepart, 2 octets multipart
         let num_blocks = new_message.len().div_ceil(8 * (payload_size - 2));
-        let mut output_blocks = Vec::<BitVec::<u8,Lsb0>>::new();
+        let mut output_blocks = Vec::<block::Block>::new();
 
         let header_size = if num_blocks == 1 { block::BLOCK_PAYLD_RANGE.start } else { block::BLOCK_MPPAY_RANGE.start };
         
@@ -162,7 +167,7 @@ impl User {
         for i in 0..std::cmp::min(new_message.len(), (payload_size-2)*8) {
             block0.push(new_message[i]);
         }
-        output_blocks.push(block0);
+        output_blocks.push(block::Block::new(addr.clone(), block0));
 
         for i in 1..num_blocks {
             let mut new_block = bitvec![u8, Lsb0; 0; header_size];
@@ -174,7 +179,7 @@ impl User {
             for j in 0..std::cmp::min(new_message.len() - (payload_size - 2)*8*i, (payload_size - 2)*8) { // why: is there a -2??
                 new_block.push(new_message[i*(payload_size - 2)*8 + j]);
             }
-            output_blocks.push(new_block);
+            output_blocks.push(block::Block::new(addr.clone(), new_block));
         }
 
         return output_blocks;
@@ -189,11 +194,14 @@ impl User {
             self.unused_ids.push(new_msg_id);
         }
 
-        let output_blocks = User::generate_msg_blocks(&new_message, is_command, new_msg_id);
+        let output_blocks = User::generate_msg_blocks(&new_message, is_command, new_msg_id, &self.address);
         let num_blocks = output_blocks.len();
 
         if self.is_encrypted {
-            // todo: implement encryption over each entry in output_blocks
+            for i in 0..num_blocks {
+                self.encrypt_block(&output_blocks[i]);
+            }
+
         }
 
         if outgoing {

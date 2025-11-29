@@ -2,10 +2,6 @@ use boost::user;
 
 use bitvec::prelude::*;
 
-pub fn test_block_ack() {
-    // todo: test_msg::test_block_ack
-}
-
 pub fn test_chunking() {
 
     // Test that a particular messages produces the expected block pattern

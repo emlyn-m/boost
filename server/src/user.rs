@@ -144,7 +144,7 @@ impl User {
                 
     }
 
-    fn generate_msg_blocks(new_message: &BitVec::<u8,Lsb0>, is_command: bool, new_msg_id: u8) -> Vec::<BitVec::<u8,Lsb0>> {
+    pub fn generate_msg_blocks(new_message: &BitVec::<u8,Lsb0>, is_command: bool, new_msg_id: u8) -> Vec::<BitVec::<u8,Lsb0>> {
         let payload_size: usize = 140;
 
         // header size: 1 octet singlepart, 2 octets multipart
@@ -183,14 +183,13 @@ impl User {
 
     // send full message through sms
     pub fn send_message(&mut self, new_message: BitVec::<u8,Lsb0>, is_command: bool, outgoing: bool) {
-        let payload_size: usize = 140;
         
         let new_msg_id = self.unused_ids.pop().expect("No available id"); // todo: proper error handling
         if !outgoing {
             self.unused_ids.push(new_msg_id);
         }
 
-        let mut output_blocks = User::generate_msg_blocks(&new_message, is_command, new_msg_id);
+        let output_blocks = User::generate_msg_blocks(&new_message, is_command, new_msg_id);
         let num_blocks = output_blocks.len();
 
         if self.is_encrypted {

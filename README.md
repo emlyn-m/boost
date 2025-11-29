@@ -1,7 +1,7 @@
+![](https://github.com/emlyn-m/boost/actions/workflows/rust.yml/badge.svg)
 # boost-sms
 
 <div align="center"><img align="center" src="assets/logo.png" /></div>
-<div align="center"><img align="center" src="https://github.com/emlyn-m/boost/actions/workflows/rust.yml/badge.svg" /></div>
 
 **<p align="center">Proxy layer for communication with Matrix bots over SMS</p>**
 
@@ -210,5 +210,6 @@ password=plaintext
 |--|--|--|--|--|--|
 |`user_id`| 0x00 | 0x08 | 8 | Yes | |
 |`domain_id` | 0x08 | 0x16 | 8 | Yes ||
+
 
 

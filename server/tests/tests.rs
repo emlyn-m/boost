@@ -15,6 +15,11 @@ mod tests {
     fn test_homeserver_creds() {
         test_creds::test_homeserver_creds();
     }
+
+    #[test]
+    fn test_bridgebot_creds() {
+        test_creds::test_bridgebot_creds();
+    }
     // == End Credential testing ==
 
 

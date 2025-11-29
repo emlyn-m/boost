@@ -1,0 +1,13 @@
+use boost::credential_manager;
+
+const CREDFILE_PATH: &str = "credfile.cfg";
+const HOMESERVER_CREDFILE_PATH: &str = "homeserver_creds.cfg";
+
+pub fn test_homeserver_creds() {
+    let homeserver_creds = match credential_manager::load_homeserver_creds(HOMESERVER_CREDFILE_PATH) {
+        Ok(creds) => creds,
+        Err(why) => panic!("Error loading homeserver credfile. aborting."),
+    };
+
+    let _ = matrix_sdk::ruma::UserId::parse(&homeserver_creds.username).expect("Failed to create user id from credfile username");
+}

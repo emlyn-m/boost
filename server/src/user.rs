@@ -7,7 +7,7 @@ use crate::credential_manager;
 use crate::matrix_message::{
     MatrixMessage, MatrixBotControlMessage
 };
-use crate::randchar::generate_random_str;
+
 use crate::sms;
 use crate::command;
 
@@ -17,11 +17,11 @@ use matrix_sdk::Client;
 use futures::executor;
 
 use std::collections::HashMap;
-use std::io::Write; 
+ 
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::Arc;
-use std::time;
+
 
 const MESSAGE_KEEPFOR_DURATION_MS: u128 = 10*1000;  // Tunable!! 10s is proooobably too low but good for testing :p
 
@@ -72,12 +72,12 @@ impl User {
     pub fn refresh_outgoing(&mut self) {
         let mut failed_outgoing: Vec::<u8> = vec![];
         for (outgoing_id, outgoing_msg) in &mut self.outgoing_messages {
-            let currentTime = std::time::Instant::now();
-            if (currentTime.duration_since(outgoing_msg.last_send_instant).as_millis()) > outgoing_message::OUTGOING_REFRESH_TIME_MS {
+            let current_time = std::time::Instant::now();
+            if (current_time.duration_since(outgoing_msg.last_send_instant).as_millis()) > outgoing_message::OUTGOING_REFRESH_TIME_MS {
                 // should attempt to resend the whole message
                 outgoing_msg.last_send_instant = std::time::Instant::now();
                 outgoing_msg.send_attempts += 1;
-                if (outgoing_msg.send_attempts > outgoing_message::MAX_SEND_RETRIES) {
+                if outgoing_msg.send_attempts > outgoing_message::MAX_SEND_RETRIES {
                     failed_outgoing.push(*outgoing_id);
                 }
                 dbg!("Unresponded to outgoing msg");
@@ -92,7 +92,7 @@ impl User {
         }
     }
 
-    pub fn decrypt_block(&self, block: &mut block::Block) {
+    pub fn decrypt_block(&self, _block: &mut block::Block) {
         
         // let _chain_key = block.data.drain(0..8).collect::<BitVec>().load::<u8>(); // pull first octet (chain index)
         
@@ -111,10 +111,10 @@ impl User {
         if !self.messages.contains_key(&msg_id) {  // todo: some way to clear these messages
             self.messages.insert(msg_id, message::Message::new(new_block));
 
-            if (!is_multipart) {
+            if !is_multipart {
                 // Check if this block is a BlockAck
                 let block_command = new_block.data.get(block::BLOCK_SPCOM_RANGE).unwrap().load::<u8>();
-                if (block_command == command::CommandValue::BlockAck as command::CommandInt) {
+                if block_command == command::CommandValue::BlockAck as command::CommandInt {
                     return (block::BlockReceivedAction::ProcessNoAck, block_idx);
                 }
             }
@@ -122,8 +122,8 @@ impl User {
         } else {
             if !is_multipart {
                 // single part message - already received
-                let currentTime = std::time::Instant::now();
-                if (currentTime.duration_since(self.messages.get(&msg_id).expect("msg_id should! be present for fetching time").received_at)).as_millis() > MESSAGE_KEEPFOR_DURATION_MS {
+                let current_time = std::time::Instant::now();
+                if (current_time.duration_since(self.messages.get(&msg_id).expect("msg_id should! be present for fetching time").received_at)).as_millis() > MESSAGE_KEEPFOR_DURATION_MS {
                     self.messages.remove(&msg_id);  // Old message, no need to keep
                 }
                 return (block::BlockReceivedAction::SendBlockAck, 0);
@@ -189,10 +189,17 @@ impl User {
         }
 
         if outgoing {
-            self.outgoing_messages.insert(new_msg_id, outgoing_message::OutgoingMessage::new(&output_blocks));
+            let command_type: command::CommandInt = match is_command {
+                true => new_message.get(0..8).unwrap().load::<u8>(),
+                false => 255 as command::CommandInt
+            };
+            let ack_data = match command_type.try_into() {
+                Ok(command::CommandValue::ChannelUpdate) => new_message.get(8..16).unwrap().load::<u8>(), // byte 2 (channel id)
+                _ => 0,
+            };
+            self.outgoing_messages.insert(new_msg_id, outgoing_message::OutgoingMessage::new(command_type, ack_data, &output_blocks));
         }
 
-        // DEBUG CODE BELOW - REPLACE WHEN HARDWARE AVAILABLE
         for i in 0..num_blocks {
             sms::send_block(self.address.as_str(), &new_msg_id, &i.try_into().expect("blockid fail in user.send"), &output_blocks[i]);
         }
@@ -224,23 +231,42 @@ impl User {
 
     pub fn process_block_ack(&mut self, msg: &BitVec<u8,Lsb0>) -> Result<(), u8> {
         // extract msg_id and block_id
-        let msg_id = msg.get(0..8).unwrap().load::<u8>(); // no error handling needed - any incoming messages have been validated as min 8 bytes
+        let msg_id = msg.get(0..8).unwrap().load::<u8>(); // no error handling needed - any incoming messages have been validated as min 1 bytes
         let block_id = match msg.get(8..16) {
             Some(v) => v,
             None => return Err(1),
         }.load::<u8>();
 
-        let msg_obj = match self.outgoing_messages.get_mut(&msg_id) {
+        let mut binding = self.outgoing_messages.clone();
+        let msg_obj = match binding.get_mut(&msg_id) {
             Some(v) => v,
             None => return Err(0),
         };
 
-        if msg_obj.acknowledge_block(&block_id) {
-            self.unused_ids.push(msg_id);
-            self.outgoing_messages.remove(&msg_id);
-        }
-        
+        let full_message_acked = msg_obj.acknowledge_block(&block_id);
+        match full_message_acked {
+            Some(cmd_type) => {
+                self.unused_ids.push(msg_id);
+                self.outgoing_messages.remove(&msg_id);
 
+                let cmd_type_u = match cmd_type.try_into() {
+                    Ok(x) => x,
+                    Err(e) => panic!("{}", e)
+                };
+
+                // special cases
+                match cmd_type_u {
+                    command::CommandValue::DomainUpdate => {
+                        self.client_has_latest_domain_info = true;
+                    },
+                    command::CommandValue::ChannelUpdate => {
+                        self.client_has_latest_channel_list[msg_obj.ack_data as usize] = true;
+                    }
+                    _ => {}
+                }
+            },
+            None => {}
+        }
 
         Ok(())
     }
@@ -286,7 +312,7 @@ impl User {
 
         here_control_tx.send(MatrixBotControlMessage::RequestChannels { domain_idx: self.matrix_bots.len().try_into().expect("Failed to case usize to u8") } );
 
-        let mut recv_matrix_channel_infos = match here_control_rx.recv() {
+        let recv_matrix_channel_infos = match here_control_rx.recv() {
             Ok(data) => data,
             Err(e) => panic!("Problem recv from control channel: {e:?}"),
         };
@@ -298,7 +324,7 @@ impl User {
         }; // blocking recv
         dbg!("Received channel info");
 
-        let new_bot_idx = &self.matrix_bots.len();
+        let _new_bot_idx = &self.matrix_bots.len();
         let new_bot_info = matrix_bot::MatrixBotInfo {
             bot_address: botcred.bot_address.clone(),
             platform: botcred.service_name.clone(),

@@ -32,30 +32,37 @@ pub enum CommandValue {
     Error = 8,
     InvalidCommand = 9,
     BlockAck = 11,
+
+    Data = 255,
 }
 
-
+impl std::convert::TryFrom<u8> for CommandValue {
+    type Error = &'static str;
+    fn try_from(command_value: u8) -> Result<Self, <CommandValue as TryFrom<u8>>::Error> {
+        if command_value == CommandValue::DhkeInit as CommandInt {  Ok(CommandValue::DhkeInit) }
+        // else if command_value == CommandValue::Unencrypted as CommandInt { CommandValue::Unencrypted }
+        else if command_value == CommandValue::AuthenticateToAccount as CommandInt {  Ok(CommandValue::AuthenticateToAccount) }
+        else if command_value == CommandValue::SignOut as CommandInt {  Ok(CommandValue::SignOut) }
+        else if command_value == CommandValue::RevokeAllClients as CommandInt {  Ok(CommandValue::RevokeAllClients) } // for some reason this is flagged as unreachable
+        else if command_value == CommandValue::RequestDomains as CommandInt {  Ok(CommandValue::RequestDomains) }
+        else if command_value == CommandValue::UnknownDomain as CommandInt {  Ok(CommandValue::UnknownDomain) }
+        else if command_value == CommandValue::TargetUserNotFound as CommandInt {  Ok(CommandValue::TargetUserNotFound) }
+        else if command_value == CommandValue::RequestKnownUsers as CommandInt {  Ok(CommandValue::RequestKnownUsers) }
+        else if command_value == CommandValue::Error as CommandInt {  Ok(CommandValue::Error) }
+        else if command_value == CommandValue::BlockAck as CommandInt { Ok(CommandValue::BlockAck) }
+        else { Err("Unknown command") }
+    }
+}
 
 pub struct Command {}
 impl Command {
-    
+
     pub fn get_matching_command(payload: &BitVec::<u8,Lsb0>) -> CommandValue {
         let command_value: CommandInt = payload.get(0..COMMAND_BITLENGTH).unwrap().load::<CommandInt>();
-        
-        {
-            if command_value == CommandValue::DhkeInit as CommandInt { CommandValue::DhkeInit }
-            // else if command_value == CommandValue::Unencrypted as CommandInt { CommandValue::Unencrypted }
-            else if command_value == CommandValue::AuthenticateToAccount as CommandInt { CommandValue::AuthenticateToAccount }
-            else if command_value == CommandValue::SignOut as CommandInt { CommandValue::SignOut }
-            else if command_value == CommandValue::RevokeAllClients as CommandInt { CommandValue::RevokeAllClients } // for some reason this is flagged as unreachable
-            else if command_value == CommandValue::RequestDomains as CommandInt { CommandValue::RequestDomains }
-            // else if command_value == CommandValue::UnknownDomain as CommandInt { CommandValue::UnknownDomain }
-            // else if command_value == CommandValue::TargetUserNotFound as CommandInt { CommandValue::TargetUserNotFound }
-            else if command_value == CommandValue::RequestKnownUsers as CommandInt { CommandValue::RequestKnownUsers }
-            else if command_value == CommandValue::Error as CommandInt { CommandValue::Error }
-            else if command_value == CommandValue::BlockAck as CommandInt { CommandValue::BlockAck }
-            else { panic!("Unknown command attempted") }
-        }
+        return match command_value.try_into() {
+            Ok(x) => x,
+            Err(_) => CommandValue::InvalidCommand
+        };
     }
 
 

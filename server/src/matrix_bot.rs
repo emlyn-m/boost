@@ -1,9 +1,9 @@
 use matrix_sdk::{
-    Client, config::SyncSettings,
-    ruma, ruma::{ user_id, events::room::message::SyncRoomMessageEvent }
+    Client,
+    ruma, ruma::{ events::room::message::SyncRoomMessageEvent }
 };
 
-use std::sync::mpsc;
+
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::Arc;
 
@@ -40,7 +40,7 @@ impl MatrixBot {
         let dm_space_id = ruma::RoomId::parse(&dm_space_name.as_str()).expect(&format!("Failed to create room ID {}", dm_space_name).as_str());
         let dm_space = (&*client).get_room(&dm_space_id).expect(format!("Failed to get dm room (ID: {})", dm_space_id).as_str());
 
-        let mut mbot = MatrixBot {
+        let mbot = MatrixBot {
             client,
             bot_address,
             platform,
@@ -115,7 +115,7 @@ impl MatrixBot {
 
                 let content = match ev {
                     SyncRoomMessageEvent::Original(msg) => msg.content.body().to_string(),
-                    SyncRoomMessageEvent::Redacted(msg) => { dbg!("todo: Handle redacted events"); return }
+                    SyncRoomMessageEvent::Redacted(_msg) => { dbg!("todo: Handle redacted events"); return }
                 };
                 
                 let channel_msg = MatrixMessage {
@@ -140,11 +140,9 @@ impl MatrixBot {
                 match latest_control_msg {
                     MatrixBotControlMessage::RequestChannels { domain_idx } => {
                         dbg!("RX ReqCh");
-                        let mut idx = 0;
                         let mut channel_infos: Vec::<MatrixChannelInfo> = vec![];
                         for channel in self.channels.iter() {
-                            channel_infos.push(channel.convert_to_info(idx));
-                            idx += 1;
+                            channel_infos.push(channel.convert_to_info());
                         }
 
                         self.internal_channels.2.send(
@@ -182,7 +180,6 @@ pub struct MatrixChannel {
     room_id: String,
 }
 pub struct MatrixChannelInfo {
-    idx: u32,
     room_id: String,
     pub display_name: String,
 }
@@ -191,9 +188,8 @@ pub struct MatrixChannelInfo {
 
 impl MatrixChannel {
 
-    pub fn convert_to_info(&self, idx: u32) -> MatrixChannelInfo {
+    pub fn convert_to_info(&self) -> MatrixChannelInfo {
         return MatrixChannelInfo {
-            idx,
             room_id: self.room_id.clone(),
             display_name: self.display_name.clone(),
         };

@@ -1,21 +1,26 @@
 use crate::block;
+use crate::command;
 
 use bitvec::prelude::*;
 use std::collections::HashMap;
-use std::time;
+
 
 
 pub const OUTGOING_REFRESH_TIME_MS: u128 = 5*1000;  // every 5 seconds
 pub const MAX_SEND_RETRIES: u32 = 5;
 
+#[derive(Clone)]
 pub struct OutgoingMessage {
+    pub msg_type: command::CommandInt,
+    pub ack_data: u8,
+
     pub stored_blocks: HashMap<u8, BitVec::<u8,Lsb0>>,
     pub last_send_instant: std::time::Instant,
     pub send_attempts: u32,
 }
 
 impl OutgoingMessage {
-    pub fn new(blocks: &Vec::<BitVec::<u8,Lsb0>>) -> OutgoingMessage {
+    pub fn new(msg_type: command::CommandInt, ack_data: u8, blocks: &Vec::<BitVec::<u8,Lsb0>>) -> OutgoingMessage {
 
         let num_blocks = blocks.len();
         let mut stored_blocks = HashMap::new();
@@ -25,6 +30,9 @@ impl OutgoingMessage {
         }
 
         let new_outgoing = OutgoingMessage {
+            msg_type,
+            ack_data,
+
             stored_blocks,
             last_send_instant: std::time::Instant::now(),
             send_attempts: 1,
@@ -33,8 +41,11 @@ impl OutgoingMessage {
         new_outgoing        
     }
 
-    pub fn acknowledge_block(&mut self, block_idx: &u8) -> bool {
+    pub fn acknowledge_block(&mut self, block_idx: &u8) -> Option<command::CommandInt> {
         self.stored_blocks.remove(block_idx);
-        return self.stored_blocks.len() == 0;
+        if self.stored_blocks.len() == 0 {
+            return Some(self.msg_type);
+        }
+        return None;
     }
 }

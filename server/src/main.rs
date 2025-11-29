@@ -12,14 +12,14 @@ mod sms;
 use bitvec::prelude::*;
 use std::collections::HashMap;
 use std::env;
-use std::sync::mpsc;
-use std::sync::mpsc::{Sender, Receiver};
+
+
 use std::sync::Arc;
 
 use matrix_sdk;
 
-use crate::matrix_bot::MatrixChannel;
-use crate::matrix_message::MatrixBotControlMessage;
+
+
 
 
 const SHAREDMEM_OUTPUT: &str = "../sharedmem/server_output";
@@ -76,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
         Ok(creds) => creds,
         Err(why) => panic!("Error loading homeserver credfile: {}. Aborting!!", why),
     };
-    let user_id = matrix_sdk::ruma::UserId::parse(&homeserver_creds.username).expect("Failed to create user id from credfile username");
+    let _user_id = matrix_sdk::ruma::UserId::parse(&homeserver_creds.username).expect("Failed to create user id from credfile username");
     let client = Arc::new(
         matrix_sdk::Client::builder()
             .homeserver_url(&homeserver_creds.address)
@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
     // initialize sync thread
     let syncing_client = client.clone();
     tokio::spawn( async move {
-        syncing_client.sync(matrix_sdk::config::SyncSettings::default()).await;
+        let _ = syncing_client.sync(matrix_sdk::config::SyncSettings::default()).await;
     });
 
     let mut users: HashMap<String, user::User> = HashMap::new(); // (Phone no., User struct)
@@ -100,11 +100,11 @@ async fn main() -> anyhow::Result<()> {
     loop {
 
         // loop over all users, and within that all matrix channels to see if we have messages we need to send
-        for (addr, mut user) in &mut users {
+        for (addr, user) in &mut users {
 
 
             // refresh users outgoing messages
-            &user.refresh_outgoing();
+            user.refresh_outgoing();
         
             for i in 0..user.matrix_bot_channels.len() {
                 let channel = &user.matrix_bot_channels[i];
@@ -249,7 +249,6 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
         let actual_payload = msg.payload.clone().split_off(8); // remove the command id from the message 
         match command_type {
             command::CommandValue::DhkeInit => { 
-                dbg!("RX DhkeInit");
                 // revoke all of our authorizations on that sender
                 for i in 0..sender.matrix_bots.len() {
                     let _ = sender.revoke_bot(i);
@@ -371,24 +370,26 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                     }
                 };
                 sender.client_has_latest_channel_list[domain_idx as usize] = false;
-                &mbot_channel_ref.2.send(matrix_message::MatrixBotControlMessage::RequestChannels { domain_idx: domain_idx.try_into().expect("usize->u8 failed when sending reqch to mbot") });
+                mbot_channel_ref.2.send(matrix_message::MatrixBotControlMessage::RequestChannels { domain_idx: domain_idx.try_into().expect("usize->u8 failed when sending reqch to mbot") });
             }
 
             command::CommandValue::RequestDomains => { 
 
                 let mut payload= bitvec![u8, Lsb0;];
                 for i in 0..(sender.matrix_bots.len()) {
+                    // todo: remove expect here with proper unknown_domain msg
                     let mut latest_domain_name = BitVec::<u8,Lsb0>::from_vec(sender.matrix_bots.get(i).expect("oobe matrix bots").bot_client_name.as_bytes().to_vec());
                     for domain_name_bit in latest_domain_name.drain(..) {
                         payload.push(domain_name_bit);
                     }
 
-                    if (i+1 != sender.matrix_bots.len()) {
-                        for j in 0..8 { payload.push(false); }
+                    if i+1 != sender.matrix_bots.len() {
+                        for _j in 0..8 { payload.push(false); }
                     }
                 }
 
-                send_command(sender, command::CommandValue::DomainUpdate as command::CommandInt, &mut payload, false);
+                sender.client_has_latest_domain_info = false;
+                send_command(sender, command::CommandValue::DomainUpdate as command::CommandInt, &mut payload, true);
              }
 
             command::CommandValue::BlockAck => { 
@@ -437,7 +438,6 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
         } 
 
         // extract informaion about platform and user
-
         let mut actual_payload = msg.payload.clone().into_vec();
 
         if actual_payload.len() < 3 { // 4 bytes minimum: 2 for user index, 1 for platform idx, 1 for the minimum possible message
@@ -455,22 +455,33 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
             send_command(sender, command::CommandValue::TargetUserNotFound as command::CommandInt, &mut bitvec![u8, Lsb0; 0; 0], false);
             return;
         }
+        if !(sender.client_has_latest_domain_info) {
+            send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Domain info out of date - Refusing to send".as_bytes().to_vec()), false);
+        }
+        if !(sender.client_has_latest_channel_list[platform_idx]) {
+            send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Channel info on domain out of date - Refusing to send".as_bytes().to_vec()), false);
+        }
 
         let msg_content_bytes = actual_payload.drain(2..).collect();
         let msg_content_str = match String::from_utf8(msg_content_bytes) {
             Ok(content) => content,
-            Err(e) => {
+            Err(_e) => {
                 send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Malformed UTF-8 Data".as_bytes().to_vec()), false);
                 return;
             }
         };
 
 
-        sender.matrix_bot_channels[platform_idx].0.send(matrix_message::MatrixMessage {
+        match sender.matrix_bot_channels[platform_idx].0.send(matrix_message::MatrixMessage {
             room_idx: user_idx,
             display_name: String::new(),
             content: msg_content_str,
-        });
+        }) {
+            Ok(()) => {},
+            Err(_e) => {
+                send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Could not send to MPSC channel".as_bytes().to_vec()), false)
+            }
+        }
 
         // todo: send some reply, but that's going to need async stuff and depends on how the matrix crate we use handles that
         //      i should really set up a homeserver soon for testing     YIPPEE I HAVE A HOMESERVER    

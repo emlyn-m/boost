@@ -1,12 +1,12 @@
 # boost-sms
 
 <div align="center"><img align="center" src="assets/logo.png" /></div>
+<div align="center"><img align="center" src="https://github.com/emlyn-m/boost/actions/workflows/rust.yml/badge.svg" /></div>
 
 **<p align="center">Proxy layer for communication with Matrix bots over SMS</p>**
 
 *<p align="center">in which our hero fulfills her childhood dream of writing a datasheet</p>*
 
-<!-- ci badge -->
 
 **<p align="center"><a href="#features">features</a></p>**
 **<p align="center"><a href="#installation--configuration">installation + configuration</a></p>**
@@ -210,4 +210,5 @@ password=plaintext
 |--|--|--|--|--|--|
 |`user_id`| 0x00 | 0x08 | 8 | Yes | |
 |`domain_id` | 0x08 | 0x16 | 8 | Yes ||
+
 

@@ -242,7 +242,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
         let command_type = match command::Command::get_matching_command(&msg.payload) {
             Ok(x) => x,
             Err(_) => {
-                send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()), false);
+                send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("malformed command".as_bytes().to_vec()), false);
                 return;
             }
         };
@@ -379,7 +379,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                 for i in 0..(sender.matrix_bots.len()) {
                     let bot_name = match sender.matrix_bots.get(i) {
                         Some(x) => x.bot_client_name.as_bytes().to_vec(),
-                        None() => {
+                        None => {
                             send_command(sender, command::CommandValue::UnknownDomain as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("No such domain".as_bytes().to_vec()), false);
                             return;
                         }

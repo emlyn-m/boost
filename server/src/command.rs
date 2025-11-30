@@ -59,10 +59,13 @@ impl Command {
 
     pub fn get_matching_command(payload: &BitVec::<u8,Lsb0>) -> Result<CommandValue, ()> {
         let command_value: CommandInt = match payload.get(0..COMMAND_BITLENGTH) {
-            Ok(x) => x.load::<CommandInt>(),
-            Err(_) => return Err()
-        }
-        return command_value.try_into()
+            Some(x) => x.load::<CommandInt>(),
+            None => return Err(())
+        };
+        return match command_value.try_into() {
+            Ok(x) => Ok(x),
+            Err(_) => Err(())
+        };
     }
 
 

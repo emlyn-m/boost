@@ -93,7 +93,7 @@ impl User {
     }
 
     pub fn encrypt_block(&self, block: &block::Block) -> block::Block {
-        // todo: user::decrypt_block
+        // todo: user::encrypt_block
         return block.clone();
     }
 

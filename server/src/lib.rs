@@ -371,8 +371,14 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
 
                 let mut payload= bitvec![u8, Lsb0;];
                 for i in 0..(sender.matrix_bots.len()) {
-                    // todo: remove expect here with proper unknown_domain msg
-                    let mut latest_domain_name = BitVec::<u8,Lsb0>::from_vec(sender.matrix_bots.get(i).expect("oobe matrix bots").bot_client_name.as_bytes().to_vec());
+                    let bot_name = match sender.matrix_bots.get(i) {
+                        Ok(x) => x.bot_client_name.as_bytes().to_vec(),
+                        Err(_) => {
+                            send_command(sender, command::CommandValue::UnknownDomain as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("No such domain".as_bytes().to_vec()), false);
+                            return;
+                        }
+                    }
+                    let mut latest_domain_name = BitVec::<u8,Lsb0>::from_vec(bot_name);
                     for domain_name_bit in latest_domain_name.drain(..) {
                         payload.push(domain_name_bit);
                     }

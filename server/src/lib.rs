@@ -239,7 +239,13 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
 
 
     if msg.is_command {
-        let command_type = command::Command::get_matching_command(&msg.payload);
+        let command_type = match command::Command::get_matching_command(&msg.payload) {
+            Ok(x) => x,
+            Err(_) => {
+                send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()), false);
+                return;
+            }
+        };
         let actual_payload = msg.payload.clone().split_off(8); // remove the command id from the message 
         match command_type {
             command::CommandValue::DhkeInit => { 
@@ -372,12 +378,12 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                 let mut payload= bitvec![u8, Lsb0;];
                 for i in 0..(sender.matrix_bots.len()) {
                     let bot_name = match sender.matrix_bots.get(i) {
-                        Ok(x) => x.bot_client_name.as_bytes().to_vec(),
-                        Err(_) => {
+                        Some(x) => x.bot_client_name.as_bytes().to_vec(),
+                        None() => {
                             send_command(sender, command::CommandValue::UnknownDomain as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("No such domain".as_bytes().to_vec()), false);
                             return;
                         }
-                    }
+                    };
                     let mut latest_domain_name = BitVec::<u8,Lsb0>::from_vec(bot_name);
                     for domain_name_bit in latest_domain_name.drain(..) {
                         payload.push(domain_name_bit);

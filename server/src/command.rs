@@ -57,12 +57,12 @@ impl std::convert::TryFrom<u8> for CommandValue {
 pub struct Command {}
 impl Command {
 
-    pub fn get_matching_command(payload: &BitVec::<u8,Lsb0>) -> CommandValue {
-        let command_value: CommandInt = payload.get(0..COMMAND_BITLENGTH).unwrap().load::<CommandInt>();
-        return match command_value.try_into() {
-            Ok(x) => x,
-            Err(_) => CommandValue::InvalidCommand
-        };
+    pub fn get_matching_command(payload: &BitVec::<u8,Lsb0>) -> Result<CommandValue, ()> {
+        let command_value: CommandInt = match payload.get(0..COMMAND_BITLENGTH) {
+            Ok(x) => x.load::<CommandInt>(),
+            Err(_) => return Err()
+        }
+        return command_value.try_into()
     }
 
 

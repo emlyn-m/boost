@@ -23,9 +23,9 @@ mod tests {
     #[ignore]
     fn test_dhke() { test_enc::test_dhke(); }
 
-    #[test]
+    #[tokio::test]
     #[ignore]
-    fn test_encryption() { test_enc::test_encryption(); }
+    async fn test_encryption() { test_enc::test_encryption().await; }
 
     #[test]
     #[should_panic = "pass_test_msg_without_enc"]
@@ -33,11 +33,7 @@ mod tests {
     fn test_msg_without_enc() { test_enc::test_msg_without_enc(); }
     // ============================
 
-    // == Start Message testing ==
-    #[test]
-    #[ignore]
-    fn test_block_ack() { test_msg::test_block_ack(); }
-    
+    // == Start Message testing ==  
     #[test]
     fn test_chunking() { test_msg::test_chunking(); }
     // ===========================

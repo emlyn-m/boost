@@ -6,3 +6,5 @@ testing/__pycache__
 
 server/credfile.cfg
 server/homeserver_creds.cfg
+
+.zed/

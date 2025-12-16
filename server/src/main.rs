@@ -1,3 +1,6 @@
 pub fn main() {
-    boost::run();
+    match boost::run() {
+        Ok(()) => return,
+        Err(e) => panic!("[error] main program panic: {}", e)
+    };
 }

@@ -6,6 +6,7 @@ use matrix_sdk::{
 
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::Arc;
+use log::{info, warn};
 
 use crate::matrix_message::MatrixMessage;
 use crate::matrix_message::MatrixBotControlMessage;
@@ -115,7 +116,7 @@ impl MatrixBot {
 
                 let content = match ev {
                     SyncRoomMessageEvent::Original(msg) => msg.content.body().to_string(),
-                    SyncRoomMessageEvent::Redacted(_msg) => { dbg!("todo: Handle redacted events"); return }
+                    SyncRoomMessageEvent::Redacted(_msg) => { info!("todo: Handle redacted events"); return }
                 };
                 
                 let channel_msg = MatrixMessage {
@@ -139,7 +140,7 @@ impl MatrixBot {
                 let latest_control_msg = latest_control_msg.expect("Failed to unwrap an OK value (control_msg)");
                 match latest_control_msg {
                     MatrixBotControlMessage::RequestChannels { domain_idx } => {
-                        dbg!("RX ReqCh");
+                        info!("rx reqchannels");
                         let mut channel_infos: Vec::<MatrixChannelInfo> = vec![];
                         for channel in self.channels.iter() {
                             channel_infos.push(channel.convert_to_info());
@@ -153,7 +154,7 @@ impl MatrixBot {
                     MatrixBotControlMessage::TerminateBot => {
                         return;
                     }
-                    _ => { dbg!("Unimpl control msg"); }  // unimplemented
+                    _ => { warn!("rx unimplemented control msg"); }  // unimplemented
                 }
             }
             

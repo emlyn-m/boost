@@ -35,7 +35,6 @@ pub fn test_chunking() {
         }
 
         let rx_block_idx = block.data[8..16].load::<u8>();
-        dbg!(rx_block_idx);
         if i == 0 { assert!((rx_block_idx as usize) + 1 == n_blocks); }
         if i != 0 { assert!((rx_block_idx as usize) != i); }
 

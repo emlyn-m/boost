@@ -40,15 +40,27 @@ impl std::convert::TryFrom<u8> for CommandValue {
     type Error = &'static str;
     fn try_from(command_value: u8) -> Result<Self, <CommandValue as TryFrom<u8>>::Error> {
         if command_value == CommandValue::DhkeInit as CommandInt {  Ok(CommandValue::DhkeInit) }
-        // else if command_value == CommandValue::Unencrypted as CommandInt { CommandValue::Unencrypted }
+        else if command_value == CommandValue::Unencrypted as CommandInt { Ok(CommandValue::Unencrypted) }
+        
         else if command_value == CommandValue::AuthenticateToAccount as CommandInt {  Ok(CommandValue::AuthenticateToAccount) }
+        else if command_value == CommandValue::AuthenticationResult as CommandInt {  Ok(CommandValue::AuthenticationResult) }
+        else if command_value == CommandValue::RequestKnownUsers as CommandInt {  Ok(CommandValue::RequestKnownUsers) }
         else if command_value == CommandValue::SignOut as CommandInt {  Ok(CommandValue::SignOut) }
+        else if command_value == CommandValue::SignOutSuccess as CommandInt {  Ok(CommandValue::SignOutSuccess) }
         else if command_value == CommandValue::RevokeAllClients as CommandInt {  Ok(CommandValue::RevokeAllClients) } // for some reason this is flagged as unreachable
         else if command_value == CommandValue::RequestDomains as CommandInt {  Ok(CommandValue::RequestDomains) }
+        else if command_value == CommandValue::RequestDomains as CommandInt {  Ok(CommandValue::RequestDomains) }
+        else if command_value == CommandValue::DomainUpdate as CommandInt {  Ok(CommandValue::DomainUpdate) }
+        else if command_value == CommandValue::ChannelUpdate as CommandInt {  Ok(CommandValue::ChannelUpdate) }
+
         else if command_value == CommandValue::UnknownDomain as CommandInt {  Ok(CommandValue::UnknownDomain) }
         else if command_value == CommandValue::TargetUserNotFound as CommandInt {  Ok(CommandValue::TargetUserNotFound) }
-        else if command_value == CommandValue::RequestKnownUsers as CommandInt {  Ok(CommandValue::RequestKnownUsers) }
+        else if command_value == CommandValue::FindUser as CommandInt {  Ok(CommandValue::FindUser) }
+        else if command_value == CommandValue::UserFound as CommandInt {  Ok(CommandValue::UserFound) }
+
+        
         else if command_value == CommandValue::Error as CommandInt {  Ok(CommandValue::Error) }
+        else if command_value == CommandValue::InvalidCommand as CommandInt {  Ok(CommandValue::InvalidCommand) }
         else if command_value == CommandValue::BlockAck as CommandInt { Ok(CommandValue::BlockAck) }
         else { Err("Unknown command") }
     }

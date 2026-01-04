@@ -72,7 +72,7 @@ impl MatrixBot {
             let convo_id = ruma::RoomId::parse(&room_id).expect(&format!("Failed to get room from m.space.child event (Address {})", room_id).as_str());
             let latest_convo_room = match self.client.get_room(&convo_id) {
                 Some(room) => room,
-                None => { println!("Failed to join room with id {}", room_id); continue; }  // typically outdated/expired/left rooms ig
+                None => { warn!("failed to join room with id {}", room_id); continue; }  // typically outdated/expired/left rooms ig
             };
 
             let convo_display_name = match latest_convo_room.name() {
@@ -165,7 +165,7 @@ impl MatrixBot {
                 let target_channel = &self.channels[latest_msg.room_idx];
                 let outgoing_payload = ruma::events::room::message::RoomMessageEventContent::text_plain(&latest_msg.content);
                 target_channel.room.send(outgoing_payload).await;
-                println!("Sending message {} to {} on platform {}", &latest_msg.content, &target_channel.display_name, &self.platform);
+                info!("sending message {} to {} on platform {}", &latest_msg.content, &target_channel.display_name, &self.platform);
             }
         }
 

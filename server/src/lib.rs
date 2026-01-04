@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 use log::{error, info, warn};
+use tokio::time::{sleep, Duration};
 
 use matrix_sdk;
 
@@ -100,6 +101,8 @@ pub async fn run() -> anyhow::Result<()> {
 
     loop {
 
+    	sleep(Duration::from_millis(5000));
+    
         // loop over all users, and within that all matrix channels to see if we have messages we need to send
         for (addr, user) in &mut users {
 

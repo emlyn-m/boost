@@ -187,8 +187,8 @@ class Cli:
 
 
     def mainloop(self):
+        time.sleep(5)
         for file in os.listdir(SHAREDMEM_OUTPUT):
-            time.sleep(1)
             payload = None
             with open(SHAREDMEM_OUTPUT + file, "rb") as inf:
                 payload = inf.read()
@@ -212,12 +212,13 @@ class Cli:
 
         if data_vals[1]:
             is_mp_first = data_vals[0]
+            is_command = data_vals[2]
             block_id = int(payload[:2], 16)
             actual_payload = payload[2:]
 
             if msg_id not in self.agent.outstanding_mp_msgs:
                 self.agent.outstanding_mp_msgs[msg_id] = PartialMessage(msg_id)
-            self.agent.outstanding_mp_msgs[msg_id].add_block(block_id, is_mp_first, is_command, actual_payload)
+            self.agent.outstanding_mp_msgs[msg_id].add_block(block_id, is_mp_first, is_command, actual_payload)   # is_command undef
             self.agent.send_msg("BlockAck", f'{msg_id:0>2X}' + f'{block_id:0>2X}')
 
             if (self.agent.outstanding_mp_msgs[msg_id].is_complete()):

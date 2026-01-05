@@ -13,6 +13,8 @@ use bitvec::prelude::*;
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
+use log::{error, info, warn};
+use tokio::time::{sleep, Duration};
 
 use matrix_sdk;
 
@@ -55,6 +57,7 @@ fn get_available_block() -> Option<block::Block> {
 
 #[tokio::main]
 pub async fn run() -> anyhow::Result<()> {
+	env_logger::init();
 
     env::set_var("RUST_BACKTRACE", "1"); // set backtrace for debugging
 
@@ -63,6 +66,7 @@ pub async fn run() -> anyhow::Result<()> {
         Ok(creds) => creds,
         Err(why) => panic!("Error loading the credential file: {}. Aborting!!", why),
     };
+    info!("Loaded credential file");
 
 
     // authenticate to matrix homeserver
@@ -70,6 +74,8 @@ pub async fn run() -> anyhow::Result<()> {
         Ok(creds) => creds,
         Err(why) => panic!("Error loading homeserver credfile: {}. Aborting!!", why),
     };
+    info!("Loaded homeserver credential file");
+    
     let _user_id = matrix_sdk::ruma::UserId::parse(&homeserver_creds.username).expect("Failed to create user id from credfile username");
     let client = Arc::new(
         matrix_sdk::Client::builder()
@@ -78,7 +84,9 @@ pub async fn run() -> anyhow::Result<()> {
             .await?
     );
     client.matrix_auth().login_username(&homeserver_creds.username, &homeserver_creds.password).send().await?;
+    info!("Logged in to homeserver");
     client.sync_once(matrix_sdk::config::SyncSettings::default()).await?;
+    info!("Initial client sync performed");
 
     // initialize sync thread
     let syncing_client = client.clone();
@@ -93,6 +101,8 @@ pub async fn run() -> anyhow::Result<()> {
 
     loop {
 
+    	sleep(Duration::from_millis(5000));
+    
         // loop over all users, and within that all matrix channels to see if we have messages we need to send
         for (addr, user) in &mut users {
 
@@ -137,7 +147,7 @@ pub async fn run() -> anyhow::Result<()> {
 
                     let mut requesting_user = match users.get_mut(&pending_ctrl.0) {
                         Some(x) => x,
-                        None => { dbg!("Failed to get user by pending msg addr");  continue; }
+                        None => { error!("Failed to get user by pending msg addr");  continue; }
                     };
 
                     let updated_channel_data = &mut BitVec::<u8,Lsb0>::new();
@@ -157,12 +167,12 @@ pub async fn run() -> anyhow::Result<()> {
                         }
                         
                     }
-                    dbg!("Send chUpdate");
+                    info!("tx channel_update");
                     send_command(&mut requesting_user, command::CommandValue::ChannelUpdate as command::CommandInt, updated_channel_data, false); 
                     requesting_user.client_has_latest_channel_list[domain_idx as usize] = true;
                 },
 
-                _ => { dbg!("Received unsupported MBOTCtrl from bot"); }
+                _ => { error!("rx unsupported mbot_ctrl from bot"); }
             }
 
 
@@ -236,12 +246,13 @@ fn send_command(sender: &mut user::User, command_type: command::CommandInt, payl
 fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<credential_manager::BridgeBotCredentials>) {
 
     let msg = sender.messages.get(&msg_id).expect("Failed to get message while processing");
-
+    info!("Received message, processing");
 
     if msg.is_command {
         let command_type = match command::Command::get_matching_command(&msg.payload) {
             Ok(x) => x,
             Err(_) => {
+            	warn!("Received malformed command from {}", sender.address);
                 send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("malformed command".as_bytes().to_vec()), false);
                 return;
             }
@@ -250,6 +261,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
         match command_type {
             command::CommandValue::DhkeInit => { 
                 // revoke all of our authorizations on that sender
+                info!("Performing dhke for user {}", sender.address);
                 for i in 0..sender.matrix_bots.len() {
                     let _ = sender.revoke_bot(i);
                 }
@@ -265,7 +277,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
         }
 
         if !sender.is_encrypted { 
-            dbg!("All commands require encryption");
+            warn!("Received msg prior to encryption");
             send_command(sender, command::CommandValue::Unencrypted as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Commands beyond INIT cannot be sent before encryption is complete".as_bytes().to_vec()), false); 
             return;
         } 
@@ -274,6 +286,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
         match command_type {
 
             command::CommandValue::AuthenticateToAccount => { 
+            	info!("rx authtoacc on {}", sender.address);
 
                 // Find positions of username and password
                 let mut username_offset: usize = 0;
@@ -361,6 +374,8 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
 
              }
             command::CommandValue::RequestKnownUsers => {
+            	info!("rx requsers on {}", sender.address);
+
                 let domain_idx: usize = actual_payload[0].try_into().expect("u8 to usize conversion failed somehow");
                 let mbot_channel_ref = match sender.matrix_bot_channels.get(domain_idx) {
                     Some(ch_ref) => ch_ref,
@@ -374,6 +389,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
             }
 
             command::CommandValue::RequestDomains => { 
+            info!("rx reqdomains on {}", sender.address);
 
                 let mut payload= bitvec![u8, Lsb0;];
                 for i in 0..(sender.matrix_bots.len()) {
@@ -399,6 +415,8 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
              }
 
             command::CommandValue::BlockAck => { 
+            info!("rx blockack on {}", sender.address);
+
                 let block_ack_send_result = sender.process_block_ack(&actual_payload); 
                 match block_ack_send_result {
                     Ok(()) => (),
@@ -412,6 +430,8 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
             }
             
             command::CommandValue::SignOut => {
+            	info!("rx revokeallclients on {}", sender.address);
+
                 let bot_index: usize = actual_payload[0].try_into().expect("u8 to usize conversion failed somehow");
                 match sender.revoke_bot(bot_index) {
                     Ok(()) => {
@@ -426,7 +446,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
             }
 
             command::CommandValue::RevokeAllClients => {
-                dbg!("Reveived revokeallclients");
+                info!("rx revokeallclients on {}", sender.address);
                 // todo: implement
                 send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Unimplemented".as_bytes().to_vec()), false);
             }
@@ -438,7 +458,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
     } else {
         // data messages cannot be sent if the user is unencrypted
         if !sender.is_encrypted { 
-            dbg!("Send failed - no encryption");
+            warn!("send failed - no encryption");
             send_command(sender, command::CommandValue::Unencrypted as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Messages cannot be sent before encryption is complete".as_bytes().to_vec()), false); 
             return;
         } 

@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::Arc;
+use log::info;
 
 
 const MESSAGE_KEEPFOR_DURATION_MS: u128 = 10*1000;  // Tunable!! 10s is proooobably too low but good for testing :p
@@ -80,7 +81,6 @@ impl User {
                 if outgoing_msg.send_attempts > outgoing_message::MAX_SEND_RETRIES {
                     failed_outgoing.push(*outgoing_id);
                 }
-                dbg!("Unresponded to outgoing msg");
                 for (block_id, block) in &outgoing_msg.stored_blocks {
                     sms::send_block(&self.address.as_str(), outgoing_id, block_id, block);
                 }
@@ -338,7 +338,7 @@ impl User {
             MatrixBotControlMessage::UpdateChannels{ channels, .. } => channels,
             _ => panic!("First message received from mbot on control channel was not of type MatrixBotControlMessage::UpdateChannels")
         }; // blocking recv
-        dbg!("Received channel info");
+        info!("rx channel_info");
 
         let _new_bot_idx = &self.matrix_bots.len();
         let new_bot_info = matrix_bot::MatrixBotInfo {

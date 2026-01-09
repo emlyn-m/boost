@@ -180,7 +180,7 @@ class Cli:
 
 
             if showlvl:
-                print(f"{Cli.LOG_COLORS[lvl]}[{lvl}]\x1b[0m", end=" ")
+                print(f"{Cli.LOG_COLORS[lvl]} {lvl} \x1b[0m", end="  ")
             print(msg, end="")
             print(strings.RESET, end=endl)
 

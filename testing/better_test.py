@@ -146,6 +146,7 @@ class Cli:
         "prod": 10,
         "err": 10,
     }
+    LOG_DISPLAY = { "debug": "dbg", "warn": "wrn", "prod": "prd", "err": "err"}
     LOG_COLORS = {
         "debug": "\x1b[48;5;162m\x1b[1m",
         "warn": "\x1b[48;5;202m\x1b[1m",
@@ -180,7 +181,7 @@ class Cli:
 
 
             if showlvl:
-                print(f"{Cli.LOG_COLORS[lvl]} {lvl} \x1b[0m", end="  ")
+                print(f"{Cli.LOG_COLORS[lvl]} {Cli.LOG_DISPLAY[lvl]} \x1b[0m", end="  ")
             print(msg, end="")
             print(strings.RESET, end=endl)
 

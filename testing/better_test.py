@@ -4,11 +4,15 @@ import secrets
 import time
 import x25519
 import os
+import socket
+from pathlib import Path
 import bitstring
 bitstring.lsb0 = False
 
-SHAREDMEM_INPUT = "../sharedmem/server_input/"
-SHAREDMEM_OUTPUT = "../sharedmem/server_output/"
+SHAREDMEM_INPUT        = "../sharedmem/server_input/"
+SHAREDMEM_OUTPUT       = "../sharedmem/server_output/"
+SERVER_IN_SOCKET_PATH  = "../server_in.sock"
+SERVER_OUT_SOCKET_PATH = "../server_out.sock"
 
 
 class Message:
@@ -102,9 +106,17 @@ class Sender:
         msg_path = SHAREDMEM_INPUT + f"/{str(self.phone_number) + "-" + str(int(random.random() * 1000))}"
         msg_path = SHAREDMEM_INPUT + f"/{str(self.phone_number)}"
         self.cli.display(f"Message file path: {os.path.abspath(msg_path)}", lvl="debug")
-        with open(msg_path, "wb") as of:
-            self.cli.display(f"Sending id[{self.msg_id}] bin[{bin(int(msg.hex(), 16))}]", lvl="debug")
-            of.write(msg)
+        
+        with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as s:
+            try:
+                s.connect(SERVER_IN_SOCKET_PATH)
+                print(f"Connected to {SERVER_IN_SOCKET_PATH}")
+                s.sendall(msg)
+            except FileNotFoundError:
+                self.display(f"Error: Socket file not found at {SERVER_IN_SOCKET_PATH}. Is the server running?", lvl="err")
+            except ConnectionRefusedError:
+                self.display("Error: Connection refused. Check server permissions or status.", lvl="err")
+
 
     def encrypt_msg(self, msg_str):
         return msg_str
@@ -187,8 +199,11 @@ class Cli:
 
 
 
-    def mainloop(self):
-        time.sleep(5)
+    def mainloop(self, s):        
+        data = s.recv(140)
+        self.display(f"rx {data!r}")
+        time.sleep(1)
+    
         for file in os.listdir(SHAREDMEM_OUTPUT):
             payload = None
             with open(SHAREDMEM_OUTPUT + file, "rb") as inf:
@@ -484,7 +499,6 @@ class CommandHandler:
             return
 
         cli.agent.send_msg("SignOut", hex(domain_idx)[2:])
-        
 
     def handle_revoke_all_clients(cli, com):
         cli.display("Error: Unimplemented (RevokeAllClients)", lvl="err")
@@ -510,15 +524,23 @@ CommandHandler.COMMAND_PREFIX_FUNCS = {
 
 def main():
     _cli = Cli()
-    while True:
-        try:
-            _cli.mainloop()
-        except KeyboardInterrupt:
-            try:
-                _cli.user_input()
-            except (EOFError, KeyboardInterrupt):
-                print("\x1b[0m")
-                exit(0)
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as s:
+            s.connect(SERVER_OUT_SOCKET_PATH)
+            while True:
+                try:
+                	_cli.mainloop(s)
+                except KeyboardInterrupt:
+                    try:
+                        _cli.user_input()
+                    except (EOFError, KeyboardInterrupt):
+                        print("\x1b[0m")
+                        exit(0)
+    except FileNotFoundError:
+        _cli.display(f"Error: Socket file not found at {SERVER_OUT_SOCKET_PATH}. Is the server running?", lvl="err")
+    except ConnectionRefusedError:
+        _cli.display("Error: Connection refused. Check server permissions or status.", lvl="err")
+
 
 if __name__ == "__main__":
     main()

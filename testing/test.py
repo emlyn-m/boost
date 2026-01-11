@@ -13,8 +13,6 @@ from pathlib import Path
 import bitstring
 bitstring.lsb0 = False
 
-SHAREDMEM_INPUT        = "../sharedmem/server_input/"
-SHAREDMEM_OUTPUT       = "../sharedmem/server_output/"
 SOCKET_PATH            = "../boost.sock"
 
 class Cli:

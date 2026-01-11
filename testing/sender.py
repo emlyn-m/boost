@@ -1,3 +1,8 @@
+import bitstring
+bitstring.lsb0 = False
+
+from message import Message
+
 class Sender:
 
     def __init__(self, phone, cli, sock):
@@ -30,11 +35,8 @@ class Sender:
             msg = bitstring.pack(Message.OUTGOING_PATTERN_COM, True, False, True, self.msg_id, Message.COMMANDS[command], payload)
 
         
-        msg = msg.tobytes()
-        msg_path = SHAREDMEM_INPUT + f"/{str(self.phone_number) + "-" + str(int(random.random() * 1000))}"
-        msg_path = SHAREDMEM_INPUT + f"/{str(self.phone_number)}"
-        
-        s.sendall(msg)
+        msg = msg.tobytes()        
+        self.sock.sendall(msg)
 
     def encrypt_msg(self, msg_str):
         return msg_str

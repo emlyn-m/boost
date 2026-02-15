@@ -21,8 +21,6 @@ class Cli:
 
     LOG_LEVELS = { "debug": 0, "warn": 8, "prod": 10, "err": 10, "default": 0 }
     LOG_DISPLAY = { "debug": "dbg", "warn": "wrn", "prod": "prd", "err": "err"}
-    LOG_COLORS = { "debug": "\x1b[48;5;162m\x1b[1m", "warn": "\x1b[48;5;202m\x1b[1m", "prod": "\x1b[48;5;66m\x1b[1m", "err": "\x1b[48;5;52m\x1b[1m" }
-
 
     def __init__(self, sock, sock_out_path):
         self.log_level = self.LOG_LEVELS["default"]
@@ -33,23 +31,21 @@ class Cli:
         self.display(f'{strings.PH_INPUT} { self.agent.phone_number }', showlvl=False)
 
 
-    def display(self, msg, lvl="prod", endl="\n", showlvl=True):
+    def display(self, msg, lvl="prod", endl="\n", showlvl=True, escape=False):
         if self.LOG_LEVELS[lvl] >= self.log_level:
 
             msgSanitized = ""  # Replace non-printable chars with unciode SYMBOL FOR characters
             for char in msg:
-                if (ord(char) <= 0x20):
+                if (ord(char) <= 0x20) and escape:
                     msgSanitized += chr(0x2400 + ord(char))
-
-                elif (ord(char) == 0x7f): # Delete
+                elif (ord(char) == 0x7f) and escape: # Delete
                     msgSanitized += chr(0x2421)
-
                 else:
                     msgSanitized += char
 
             if showlvl:
-                print(f"{Cli.LOG_COLORS[lvl]} {Cli.LOG_DISPLAY[lvl]} \x1b[0m", end="  ")
-            print(msg, end="")
+                print(f"{strings.LOG_COLORS[lvl]} {Cli.LOG_DISPLAY[lvl]} \x1b[0m", end="  ")
+            print(msgSanitized, end="")
             print(strings.RESET, end=endl)
 
 
@@ -57,7 +53,6 @@ class Cli:
     def mainloop(self):
         try:
             payload = self.sock.recv(140)
-            self.display(f"rx {payload!r}")
             self.preprocess_msg(payload)
         except BlockingIOError:
             pass
@@ -109,9 +104,6 @@ class Cli:
 
 
     def receive_msg(self, is_command, payload):
-
-        self.display(f"Payload: {payload.replace("\x00", "")}", lvl="prod")
-
         bsdata = bitstring.BitArray(hex=payload)
 
         if not is_command:
@@ -134,6 +126,8 @@ class Cli:
             command_type = data_vals[0]
             payload = data_vals[1]
             self.display(f"Command: {Message.COMMANDS_REVERSE[command_type]}", lvl="prod")
+            self.display(f"Payload:\u00a0<{bytes.fromhex(payload).decode('utf-8')}>", lvl="prod", escape=True)
+
 
             if command_type == Message.COMMANDS["DhkeInit"]: # this is silly
                 ResponseCommandHandler.recvhandle_init(self, payload)
@@ -155,12 +149,9 @@ class Cli:
         command = input(strings.COMMAND_INPUT)
 
         for command_prefix, handler_func in CommandHandler.COMMAND_PREFIX_FUNCS.items():
-
             if command.startswith(command_prefix):
                 handler_func(self, command)
                 break
-
-
         else:
             self.display("Unknown command", lvl="err", showlvl=True)
 
@@ -168,10 +159,9 @@ class Cli:
 def main():
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+            Path(SOCK_OUT_PATH).unlink(missing_ok=True)
             sock.bind(SOCK_OUT_PATH)
-            # sock.connect(SOCK_IN_PATH)
             sock.setblocking(False)
-
 
             _cli = Cli(sock, SOCK_IN_PATH)
             while True:
@@ -184,10 +174,10 @@ def main():
                     except (EOFError, KeyboardInterrupt):
                         print("\x1b[0m")
                         exit(0)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"error: socket file not found (expected at {SOCK_IN_PATH}, {SOCK_OUT_PATH})")
     except ConnectionRefusedError:
         raise ConnectionRefusedError("error: socket connection refused.")
+    except PermissionError:
+        raise PermissionError("error: failed to unlink old socket {}", SOCK_OUT_PATH)
 
 
 if __name__ == "__main__":

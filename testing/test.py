@@ -126,7 +126,7 @@ class Cli:
             command_type = data_vals[0]
             payload = data_vals[1]
             self.display(f"Command: {Message.COMMANDS_REVERSE[command_type]}", lvl="prod")
-            self.display(f"Payload:\u00a0<{bytes.fromhex(payload).decode('utf-8')}>", lvl="prod", escape=True)
+            self.display(f"Payload:\u00a0<{bytes.fromhex(payload).decode('utf-8', errors='ignore')}>", lvl="prod", escape=True)
 
 
             if command_type == Message.COMMANDS["DhkeInit"]: # this is silly

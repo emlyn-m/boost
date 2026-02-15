@@ -33,14 +33,9 @@ impl SocketSMSHandler {
 	       		Err(_e) => return Err(anyhow::Error::msg("Failed to remove old sock_in"))
 	     	}
 	    }
-	    if sock_out_path.exists() { 
-	    	match fs::remove_file(&sock_out_path) {
-	     		Ok(()) => (),
-	       		Err(_e) => return Err(anyhow::Error::msg("Failed to remove old sock_out"))
-	     	}
-	    }
 
 	    let sock = UnixDatagram::bind(sock_in_path)?;
+		info!("Bound to socket {}", &sock_in_path.display());
 		// sock.connect(sock_out_path)?;
 	    sock.set_nonblocking(true)?;
 					
@@ -57,9 +52,8 @@ impl HandleSMS for SocketSMSHandler {
 
 	fn send_block(&self, target: &str, content: &block::Block) {
 	
-		info!("Sending block {} to target {}", &content.data.clone(), target);
+		info!("Sending block to target {}", target);
 		let resp = self.sock.send_to(content.data.as_raw_slice(), &self.sock_out_path);
-		warn!("{:?}", &resp);
 		if let Err(send_res) = resp {
 		    warn!("Failed to send message: {}", send_res);
 		}	

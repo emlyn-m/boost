@@ -1,6 +1,5 @@
 server/target
 server/Cargo.lock
-sharedmem/
 testing/__pycache__
 
 

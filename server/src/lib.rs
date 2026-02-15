@@ -6,7 +6,7 @@ mod outgoing_message;
 mod matrix_bot;
 mod matrix_message;
 mod randchar;
-mod sms;
+pub mod sms;
 pub mod credential_manager;
 
 use std::env;

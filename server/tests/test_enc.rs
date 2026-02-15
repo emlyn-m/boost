@@ -7,9 +7,9 @@ use std::sync::Arc;
 use bitvec::prelude::*;
 use matrix_sdk;
 
-const HOMESERVER_CREDFILE_PATH: &str = "homeserver_creds.cfg";
-const SOCK_IN_PATH: &str = "/home/emlyn/pets/boost/boost_sin.sock";
-const SOCK_OUT_PATH: &str = "/home/emlyn/pets/boost/boost_sout.sock";
+const HOMESERVER_CREDFILE_PATH: &str = "./test_homeserver_creds.cfg";
+const SOCK_IN_PATH: &str = "./boost_sin.sock";
+const SOCK_OUT_PATH: &str = "./boost_sout.sock";
 
 #[test]
 #[ignore]

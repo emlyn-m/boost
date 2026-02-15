@@ -2,15 +2,16 @@
     Set of functions to manage saving and loading credentials for bridge bots
 */
 
-#![allow(unused)] 
+// #![allow(unused)] 
 
 use std::fs;
 use regex::Regex;
 use bcrypt;
-use log::info;
+use std::hash::Hash;
 
 const SUPPORTED_PLATFORMS: &[&str] = &["discord", "instagram", "fb_messenger", "test_platform"];
 
+#[derive(PartialEq, Eq, Hash)]
 pub struct HomeserverCredentials {
     pub address: String,
     pub username: String,
@@ -63,7 +64,7 @@ pub fn load_homeserver_creds(credfile_path: &'static str) -> Result<HomeserverCr
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct BridgeBotCredentials {
     pub bot_address: String, // address of the puppeting bot on our homeserver
     pub service_name: String, // name of the external service, used to handle username conflicts between platforms

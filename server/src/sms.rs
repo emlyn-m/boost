@@ -69,8 +69,9 @@ impl HandleSMS for SocketSMSHandler {
 		};
 
 		// todo: some way to get addr
-		info!("Received new block of size {}", bytes_read);
-		Some(block::Block::new( "ph_null".to_string(), BitVec::<u8,Lsb0>::from_vec(buf[..bytes_read].to_vec()) ))
+		let addr = "ph_null".to_string();
+		info!("Received new block of size {} from {}", bytes_read, &addr);
+		Some(block::Block::new( addr, BitVec::<u8,Lsb0>::from_vec(buf[..bytes_read].to_vec()) ))
 	}
 }
 

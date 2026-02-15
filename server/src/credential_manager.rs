@@ -7,6 +7,7 @@
 use std::fs;
 use regex::Regex;
 use bcrypt;
+use log::info;
 
 const SUPPORTED_PLATFORMS: &[&str] = &["discord", "instagram", "fb_messenger", "test_platform"];
 
@@ -62,6 +63,7 @@ pub fn load_homeserver_creds(credfile_path: &'static str) -> Result<HomeserverCr
 }
 
 
+#[derive(Debug)]
 pub struct BridgeBotCredentials {
     pub bot_address: String, // address of the puppeting bot on our homeserver
     pub service_name: String, // name of the external service, used to handle username conflicts between platforms
@@ -109,7 +111,7 @@ fn set_credential(store: &mut String, key: &str, val: String) -> Result<(), Stri
     }
 }
 
-pub fn load_credential_file(credfile_path: &'static str, current_credentials: &Vec::<BridgeBotCredentials>) -> Result<(), String> {
+pub fn load_credential_file(credfile_path: &'static str) -> Result<Vec::<BridgeBotCredentials>, String> {
     let mut current_credentials: Vec::<BridgeBotCredentials> = vec![];
     let contents = match fs::read_to_string(credfile_path) {
         Ok(cont) => cont,
@@ -192,5 +194,5 @@ pub fn load_credential_file(credfile_path: &'static str, current_credentials: &V
 
     }
 
-    Ok(())
+    Ok(current_credentials)
 }

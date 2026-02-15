@@ -22,18 +22,17 @@ const SOCK_OUT_PATH: &str = "/home/emlyn/pets/boost/boost_sout.sock";
 const CREDFILE_PATH: &str = "credfile.cfg";
 const HOMESERVER_CREDFILE_PATH: &str = "homeserver_creds.cfg";
 
-pub async fn init(bot_credentials: &Vec::<credential_manager::BridgeBotCredentials>) -> anyhow::Result<(Arc<matrix_sdk::Client>, sms::SocketSMSHandler)> {
+pub async fn init() -> anyhow::Result<(Arc<matrix_sdk::Client>, Vec::<credential_manager::BridgeBotCredentials>, sms::SocketSMSHandler)> {
  	env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     env::set_var("RUST_BACKTRACE", "1"); // set backtrace for debugging
 
     let socket = sms::SocketSMSHandler::new(std::path::Path::new(SOCK_IN_PATH), std::path::Path::new(SOCK_OUT_PATH))?;
     
     // Load our bot credentials from our credential file
-    match credential_manager::load_credential_file(CREDFILE_PATH, bot_credentials) {
+    let bot_credentials = match credential_manager::load_credential_file(CREDFILE_PATH) {
         Ok(creds) => creds,
         Err(why) => return Err(anyhow::Error::msg(format!("Error loading credential file: {}", why))),
-    };
-    
+    };    
     info!("Loaded credential file");
 
 
@@ -62,13 +61,12 @@ pub async fn init(bot_credentials: &Vec::<credential_manager::BridgeBotCredentia
     });
 
    	info!("Initialization  complete");
-    Ok(( client, socket ))
+    Ok(( client, bot_credentials, socket ))
 }
 
 #[tokio::main]
 pub async fn run() -> anyhow::Result<()> {
-	let bot_credentials = vec![];
-	let (client, sms_agent) = init(&bot_credentials).await?;
+	let (client, bot_credentials, sms_agent) = init().await?;
 
     let mut users: HashMap<String, user::User<sms::SocketSMSHandler>> = HashMap::new(); // (Phone no., User struct)
 

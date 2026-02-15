@@ -109,7 +109,7 @@ fn set_credential(store: &mut String, key: &str, val: String) -> Result<(), Stri
     }
 }
 
-pub fn load_credential_file(credfile_path: &'static str) -> Result<Vec::<BridgeBotCredentials>, String> {
+pub fn load_credential_file(credfile_path: &'static str, current_credentials: &Vec::<BridgeBotCredentials>) -> Result<(), String> {
     let mut current_credentials: Vec::<BridgeBotCredentials> = vec![];
     let contents = match fs::read_to_string(credfile_path) {
         Ok(cont) => cont,
@@ -192,5 +192,5 @@ pub fn load_credential_file(credfile_path: &'static str) -> Result<Vec::<BridgeB
 
     }
 
-    return Ok(current_credentials);
+    Ok(())
 }

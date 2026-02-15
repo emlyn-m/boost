@@ -9,73 +9,45 @@ mod randchar;
 mod sms;
 pub mod credential_manager;
 
-use bitvec::prelude::*;
-use std::collections::HashMap;
 use std::env;
-use std::sync::Arc;
 use log::{error, info, warn};
+use std::thread;
 use tokio::time::{sleep, Duration};
+use std::sync::Arc;
+use std::collections::HashMap;
+use std::io::prelude::*;
+use std::fs;
+use std::os::unix::net::UnixListener;
 
 use matrix_sdk;
+use bitvec::prelude::*;
 
-const SHAREDMEM_OUTPUT: &str = "../sharedmem/server_output";
-const SHAREDMEM_INPUT: &str = "../sharedmem/server_input/";
-
+const SOCK_IN_PATH: &str = "/home/emlyn/pets/boost/boost_sin.sock";
+const SOCK_OUT_PATH: &str = "/home/emlyn/pets/boost/boost_sout.sock";
 const CREDFILE_PATH: &str = "credfile.cfg";
 const HOMESERVER_CREDFILE_PATH: &str = "homeserver_creds.cfg";
 
-// == DEBUG CODE - REPLACE WHEN HARDWARE DONE ==
-fn get_available_block() -> Option<block::Block> {
-    let paths = std::fs::read_dir(SHAREDMEM_INPUT).unwrap();
-    for direntry in paths {
-        let _path = direntry.unwrap().path();
-        let path = _path.as_path();
-
-        if !path.is_dir() {
-
-            // new message
-            let addr : String = path.file_name().unwrap().to_str()?.to_string();
-            let mut file = match std::fs::File::open(path) {
-                Err(why) => panic!("Could not open file: {}", why),
-                Ok(file) => file,
-            };
-            let mut data = bitvec![u8, Lsb0;];
-            let _ = std::io::copy(&mut file, &mut data); // error handling needed
-
-            let new_block = block::Block::new(
-                addr, 
-                data,
-            );
-            let _ = std::fs::remove_file(path); // error handling needed
-
-            return Some(new_block);
-        }
-    }
-
-    None
-}
-
-#[tokio::main]
-pub async fn run() -> anyhow::Result<()> {
-	env_logger::init();
-
+pub async fn init(bot_credentials: &Vec::<credential_manager::BridgeBotCredentials>) -> anyhow::Result<(Arc<matrix_sdk::Client>, sms::SMSHandler)> {
+ 	env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     env::set_var("RUST_BACKTRACE", "1"); // set backtrace for debugging
 
+    let socket = sms::SMSHandler::new(std::path::Path::new(SOCK_IN_PATH), std::path::Path::new(SOCK_OUT_PATH))?;
+    
     // Load our bot credentials from our credential file
-    let bot_credentials = match credential_manager::load_credential_file(CREDFILE_PATH) {
+    match credential_manager::load_credential_file(CREDFILE_PATH, bot_credentials) {
         Ok(creds) => creds,
-        Err(why) => panic!("Error loading the credential file: {}. Aborting!!", why),
+        Err(why) => return Err(anyhow::Error::msg(format!("Error loading credential file: {}", why))),
     };
+    
     info!("Loaded credential file");
 
 
     // authenticate to matrix homeserver
     let homeserver_creds = match credential_manager::load_homeserver_creds(HOMESERVER_CREDFILE_PATH) {
         Ok(creds) => creds,
-        Err(why) => panic!("Error loading homeserver credfile: {}. Aborting!!", why),
+        Err(why) => return Err(anyhow::Error::msg("Error loading homeserver creds")),
     };
     info!("Loaded homeserver credential file");
-    
     let _user_id = matrix_sdk::ruma::UserId::parse(&homeserver_creds.username).expect("Failed to create user id from credfile username");
     let client = Arc::new(
         matrix_sdk::Client::builder()
@@ -87,12 +59,21 @@ pub async fn run() -> anyhow::Result<()> {
     info!("Logged in to homeserver");
     client.sync_once(matrix_sdk::config::SyncSettings::default()).await?;
     info!("Initial client sync performed");
-
+    
     // initialize sync thread
     let syncing_client = client.clone();
     tokio::spawn( async move {
         let _ = syncing_client.sync(matrix_sdk::config::SyncSettings::default()).await;
     });
+
+   	info!("Initialization  complete");
+    Ok(( client, socket ))
+}
+
+#[tokio::main]
+pub async fn run() -> anyhow::Result<()> {
+	let mut bot_credentials = vec![];
+	let (client, sms_agent) = init(&bot_credentials).await?;
 
     let mut users: HashMap<String, user::User> = HashMap::new(); // (Phone no., User struct)
 
@@ -100,8 +81,6 @@ pub async fn run() -> anyhow::Result<()> {
     let mut pending_control_msgs: Vec::<(String, matrix_message::MatrixBotControlMessage)> = vec![]; // (ph number, ctrl message)
 
     loop {
-
-    	sleep(Duration::from_millis(5000));
     
         // loop over all users, and within that all matrix channels to see if we have messages we need to send
         for (addr, user) in &mut users {
@@ -137,9 +116,9 @@ pub async fn run() -> anyhow::Result<()> {
             true_content_vec.insert(0, pending.1.try_into().expect("Failed conversion usize -> u8")); // push platform idx
             true_content_vec.insert(0, pending.2.room_idx.try_into().expect("Failed conversion usize -> u8"));  // push room idx
             user.send_message(BitVec::<u8,Lsb0>::from_vec(true_content_vec), false, true);
-
         }
 
+        // check for control messages from mbot threads
         for pending_ctrl in pending_control_msgs.drain(..) {
 
             match pending_ctrl.1 {
@@ -174,13 +153,10 @@ pub async fn run() -> anyhow::Result<()> {
 
                 _ => { error!("rx unsupported mbot_ctrl from bot"); }
             }
-
-
         }
 
-
-
-        let mut new_block = match get_available_block() {
+        // check for recv block
+        let mut new_block = match sms_agent.recv_block() {
             None => { continue; },
             Some(v) => { v }
         };
@@ -188,7 +164,7 @@ pub async fn run() -> anyhow::Result<()> {
         let sender_addr = new_block.addr.clone();
 
         if !users.contains_key(&sender_addr) {
-            users.insert(sender_addr.clone(), user::User::new(client.clone(), sender_addr.clone(), false));
+            users.insert(sender_addr.clone(), user::User::new(client.clone(), sender_addr.clone(), false, &sms_agent));
         }
 
         let sender = users.get_mut(&sender_addr).unwrap(); // sender is a &mut

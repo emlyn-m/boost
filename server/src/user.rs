@@ -26,7 +26,7 @@ use log::info;
 
 const MESSAGE_KEEPFOR_DURATION_MS: u128 = 10*1000;  // Tunable!! 10s is proooobably too low but good for testing :p
 
-pub struct User {
+pub struct User<'a> {
     pub address: String,
     pub is_encrypted: bool,
 
@@ -43,11 +43,13 @@ pub struct User {
     pub matrix_bot_channels: Vec::<MatrixBotChannels>,
     pub client_has_latest_channel_list: Vec::<bool>,
     pub client_has_latest_domain_info: bool,
+    
+    pub sms_handler: &'a sms::SMSHandler
 }
 
-impl User {
+impl User<'_> {
 
-    pub fn new(client: Arc<Client>, addr: String, is_enc: bool) -> User {
+	pub fn new(client: Arc<Client>, addr: String, is_enc: bool, sms_handler: &sms::SMSHandler) -> User {
         let mut new_user = User {
             address: addr,
             is_encrypted: is_enc,
@@ -60,6 +62,7 @@ impl User {
             matrix_bot_channels: vec![],
             client_has_latest_channel_list: vec![], // channel info: list of users on a given platform
             client_has_latest_domain_info: false,  // domain info: list of platforms
+            sms_handler,
         };
 
         for i in 1<<4..1<<5 {
@@ -82,7 +85,7 @@ impl User {
                     failed_outgoing.push(*outgoing_id);
                 }
                 for (block_id, block) in &outgoing_msg.stored_blocks {
-                    sms::send_block(&self.address.as_str(), outgoing_id, block_id, block);
+                    self.sms_handler.send_block(&self.address.as_str(), block);
                 }
             }
         }
@@ -217,7 +220,7 @@ impl User {
         }
 
         for i in 0..num_blocks {
-            sms::send_block(self.address.as_str(), &new_msg_id, &i.try_into().expect("blockid fail in user.send"), &output_blocks[i]);
+            self.sms_handler.send_block(self.address.as_str(), &output_blocks[i]);
         }
 
     }

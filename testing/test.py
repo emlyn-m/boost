@@ -13,7 +13,9 @@ from pathlib import Path
 import bitstring
 bitstring.lsb0 = False
 
-SOCKET_PATH            = "../boost.sock"
+SOCK_IN_PATH = "/home/emlyn/pets/boost/boost_sin.sock"
+SOCK_OUT_PATH = "/home/emlyn/pets/boost/boost_sout.sock"
+
 
 class Cli:
 
@@ -22,12 +24,14 @@ class Cli:
     LOG_COLORS = { "debug": "\x1b[48;5;162m\x1b[1m", "warn": "\x1b[48;5;202m\x1b[1m", "prod": "\x1b[48;5;66m\x1b[1m", "err": "\x1b[48;5;52m\x1b[1m" }
 
 
-    def __init__(self, sock):
+    def __init__(self, sock, sock_out_path):
         self.log_level = self.LOG_LEVELS["default"]
         self.display(strings.INFO_MSG, showlvl=False)
-        
+
         self.sock = sock
-        self.agent = Sender(CommandHandler.handle_ph(self, None), self, self.sock)
+        self.agent = Sender(''.join([ random.choice('123456789') for _ in range(10) ]), self, self.sock, sock_out_path )
+        self.display(f'{strings.PH_INPUT} { self.agent.phone_number }', showlvl=False)
+
 
     def display(self, msg, lvl="prod", endl="\n", showlvl=True):
         if self.LOG_LEVELS[lvl] >= self.log_level:
@@ -50,18 +54,13 @@ class Cli:
 
 
 
-    def mainloop(self):     
-        data = self.sock.recv(140)
-        self.display(f"rx {data!r}")
-        time.sleep(1)
-    
-        for file in os.listdir(SHAREDMEM_OUTPUT):
-            payload = None
-            with open(SHAREDMEM_OUTPUT + file, "rb") as inf:
-                payload = inf.read()
-
-            os.remove(os.path.abspath(SHAREDMEM_OUTPUT + file))
+    def mainloop(self):
+        try:
+            payload = self.sock.recv(140)
+            self.display(f"rx {payload!r}")
             self.preprocess_msg(payload)
+        except BlockingIOError:
+            pass
 
 
     def preprocess_msg(self, data):
@@ -160,7 +159,7 @@ class Cli:
             if command.startswith(command_prefix):
                 handler_func(self, command)
                 break
-            
+
 
         else:
             self.display("Unknown command", lvl="err", showlvl=True)
@@ -168,13 +167,17 @@ class Cli:
 
 def main():
     try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-            sock.connect(SOCKET_PATH)
-            
-            _cli = Cli(sock)
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+            sock.bind(SOCK_OUT_PATH)
+            # sock.connect(SOCK_IN_PATH)
+            sock.setblocking(False)
+
+
+            _cli = Cli(sock, SOCK_IN_PATH)
             while True:
                 try:
-                	_cli.mainloop()
+                    _cli.mainloop()
+                    time.sleep(1)
                 except KeyboardInterrupt:
                     try:
                         _cli.user_input()
@@ -182,7 +185,7 @@ def main():
                         print("\x1b[0m")
                         exit(0)
     except FileNotFoundError:
-        raise FileNotFoundError(f"error: socket file not found (expected at {SOCKET_PATH})")
+        raise FileNotFoundError(f"error: socket file not found (expected at {SOCK_IN_PATH}, {SOCK_OUT_PATH})")
     except ConnectionRefusedError:
         raise ConnectionRefusedError("error: socket connection refused.")
 

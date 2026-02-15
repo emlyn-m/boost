@@ -1,4 +1,6 @@
 import strings
+import secrets
+import x25519
 
 
 class CommandHandler:

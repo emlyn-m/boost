@@ -5,7 +5,7 @@ from message import Message
 
 class Sender:
 
-    def __init__(self, phone, cli, sock):
+    def __init__(self, phone, cli, sock, sock_path):
         if phone[0] == "+":
             phone = phone[1:]
         self.phone_number = int(phone)
@@ -24,6 +24,7 @@ class Sender:
         self.outstanding_mp_msgs = {}  # Map<MsgId: PartialMessage>
         
         self.sock = sock
+        self.sock_path = sock_path
 
     def send_msg(self, command, payload):  # todo: multipart support
         self.msg_id = (self.msg_id + 1) % 32
@@ -36,7 +37,7 @@ class Sender:
 
         
         msg = msg.tobytes()        
-        self.sock.sendall(msg)
+        self.sock.sendto(msg, self.sock_path)
 
     def encrypt_msg(self, msg_str):
         return msg_str

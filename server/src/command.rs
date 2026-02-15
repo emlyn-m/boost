@@ -32,8 +32,6 @@ pub enum CommandValue {
     Error = 8,
     InvalidCommand = 9,
     BlockAck = 11,
-
-    Data = 255,
 }
 
 impl std::convert::TryFrom<u8> for CommandValue {

@@ -49,7 +49,7 @@ pub struct User<'a> {
 
 impl User<'_> {
 
-	pub fn new(client: Arc<Client>, addr: String, is_enc: bool, sms_handler: &sms::SMSHandler) -> User {
+    pub fn new(client: Arc<Client>, addr: String, is_enc: bool, sms_handler: &sms::SMSHandler) -> User<'_> {
         let mut new_user = User {
             address: addr,
             is_encrypted: is_enc,
@@ -84,7 +84,7 @@ impl User<'_> {
                 if outgoing_msg.send_attempts > outgoing_message::MAX_SEND_RETRIES {
                     failed_outgoing.push(*outgoing_id);
                 }
-                for (block_id, block) in &outgoing_msg.stored_blocks {
+                for (_block_id, block) in &outgoing_msg.stored_blocks {
                     self.sms_handler.send_block(&self.address.as_str(), block);
                 }
             }
@@ -329,7 +329,7 @@ impl User<'_> {
         });
         
 
-        here_control_tx.send(MatrixBotControlMessage::RequestChannels { domain_idx: self.matrix_bots.len().try_into().expect("Failed to case usize to u8") } );
+        let _ = here_control_tx.send(MatrixBotControlMessage::RequestChannels { domain_idx: self.matrix_bots.len().try_into().expect("Failed to case usize to u8") } );
 
         let recv_matrix_channel_infos = match here_control_rx.recv() {
             Ok(data) => data,
@@ -368,7 +368,7 @@ impl User<'_> {
         }
 
         // send kill signal
-        self.matrix_bot_channels.get(bot_index).unwrap().2.send(MatrixBotControlMessage::TerminateBot);
+        let _ = self.matrix_bot_channels.get(bot_index).unwrap().2.send(MatrixBotControlMessage::TerminateBot);
 
         self.client_has_latest_channel_list.remove(bot_index);
         self.matrix_bot_channels.remove(bot_index);

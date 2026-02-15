@@ -49,7 +49,7 @@ pub async fn test_encryption() {
     let test_block = block::Block::new("test_addr".to_string(), test_payload_bitvec.clone());
 
     let enc_block = test_user.encrypt_block(&test_block);
-    let dec_block = test_user.decrypt_block(&test_block);
+    let dec_block = test_user.decrypt_block(&enc_block);
     assert!(test_payload_bitvec == dec_block.data);
 
 }

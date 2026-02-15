@@ -112,7 +112,7 @@ impl MatrixBot {
             let room_idx = i.clone();
             let room_dn = self.channels[i].display_name.clone();
     
-            &(self.channels[i].room).add_event_handler(move |ev: SyncRoomMessageEvent| async move {
+            (self.channels[i].room).add_event_handler(move |ev: SyncRoomMessageEvent| async move {
 
                 let content = match ev {
                     SyncRoomMessageEvent::Original(msg) => msg.content.body().to_string(),
@@ -125,7 +125,7 @@ impl MatrixBot {
                     content: content
                 };
     
-                room_tx_channel.send(channel_msg);
+                let _ = room_tx_channel.send(channel_msg);
             });
         }
     
@@ -146,7 +146,7 @@ impl MatrixBot {
                             channel_infos.push(channel.convert_to_info());
                         }
 
-                        self.internal_channels.2.send(
+                        let _ = self.internal_channels.2.send(
                             MatrixBotControlMessage::UpdateChannels{ domain_idx: domain_idx, channels: channel_infos }
                         );
                     }
@@ -164,7 +164,7 @@ impl MatrixBot {
                 let latest_msg = latest_msg.expect("Failed to unwrap an OK value (matrix_msg)");
                 let target_channel = &self.channels[latest_msg.room_idx];
                 let outgoing_payload = ruma::events::room::message::RoomMessageEventContent::text_plain(&latest_msg.content);
-                target_channel.room.send(outgoing_payload).await;
+                let _ = target_channel.room.send(outgoing_payload).await;
                 info!("sending message {} to {} on platform {}", &latest_msg.content, &target_channel.display_name, &self.platform);
             }
         }

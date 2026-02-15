@@ -5,19 +5,13 @@ mod command;
 mod outgoing_message;
 mod matrix_bot;
 mod matrix_message;
-mod randchar;
 pub mod sms;
 pub mod credential_manager;
 
 use std::env;
 use log::{error, info, warn};
-use std::thread;
-use tokio::time::{sleep, Duration};
 use std::sync::Arc;
 use std::collections::HashMap;
-use std::io::prelude::*;
-use std::fs;
-use std::os::unix::net::UnixListener;
 
 use matrix_sdk;
 use bitvec::prelude::*;
@@ -45,7 +39,7 @@ pub async fn init(bot_credentials: &Vec::<credential_manager::BridgeBotCredentia
     // authenticate to matrix homeserver
     let homeserver_creds = match credential_manager::load_homeserver_creds(HOMESERVER_CREDFILE_PATH) {
         Ok(creds) => creds,
-        Err(why) => return Err(anyhow::Error::msg("Error loading homeserver creds")),
+        Err(why) => return Err(anyhow::Error::msg(format!("Error loading homeserver creds: {}", why))),
     };
     info!("Loaded homeserver credential file");
     let _user_id = matrix_sdk::ruma::UserId::parse(&homeserver_creds.username).expect("Failed to create user id from credfile username");
@@ -72,7 +66,7 @@ pub async fn init(bot_credentials: &Vec::<credential_manager::BridgeBotCredentia
 
 #[tokio::main]
 pub async fn run() -> anyhow::Result<()> {
-	let mut bot_credentials = vec![];
+	let bot_credentials = vec![];
 	let (client, sms_agent) = init(&bot_credentials).await?;
 
     let mut users: HashMap<String, user::User> = HashMap::new(); // (Phone no., User struct)
@@ -198,9 +192,6 @@ pub async fn run() -> anyhow::Result<()> {
         }
 
     }
-
-    Ok(())
-
 }
 
 fn send_block_ack(sender: &mut user::User, block_idx: u8, new_block_msgid: u8) {
@@ -361,7 +352,7 @@ fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<
                     }
                 };
                 sender.client_has_latest_channel_list[domain_idx as usize] = false;
-                mbot_channel_ref.2.send(matrix_message::MatrixBotControlMessage::RequestChannels { domain_idx: domain_idx.try_into().expect("usize->u8 failed when sending reqch to mbot") });
+                let _ = mbot_channel_ref.2.send(matrix_message::MatrixBotControlMessage::RequestChannels { domain_idx: domain_idx.try_into().expect("usize->u8 failed when sending reqch to mbot") });
             }
 
             command::CommandValue::RequestDomains => { 

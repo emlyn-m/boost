@@ -4,10 +4,7 @@ use crate::outgoing_message;
 use crate::matrix_bot;
 use crate::matrix_bot::MatrixBotChannels;
 use crate::credential_manager;
-use crate::matrix_message::{
-    MatrixMessage, MatrixBotControlMessage
-};
-
+use crate::matrix_message::{ MatrixMessage, MatrixBotControlMessage };
 use crate::sms;
 use crate::command;
 
@@ -26,7 +23,7 @@ use log::info;
 
 const MESSAGE_KEEPFOR_DURATION_MS: u128 = 10*1000;  // Tunable!! 10s is proooobably too low but good for testing :p
 
-pub struct User<'a> {
+pub struct User<'a, SMSHandlerT: sms::HandleSMS> {
     pub address: String,
     pub is_encrypted: bool,
 
@@ -44,12 +41,12 @@ pub struct User<'a> {
     pub client_has_latest_channel_list: Vec::<bool>,
     pub client_has_latest_domain_info: bool,
     
-    pub sms_handler: &'a sms::SMSHandler
+    pub sms_handler: &'a SMSHandlerT
 }
 
-impl User<'_> {
+impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
 
-    pub fn new(client: Arc<Client>, addr: String, is_enc: bool, sms_handler: &sms::SMSHandler) -> User<'_> {
+    pub fn new(client: Arc<Client>, addr: String, is_enc: bool, sms_handler: &SMSHandlerT) -> User<'_, SMSHandlerT> {
         let mut new_user = User {
             address: addr,
             is_encrypted: is_enc,
@@ -197,7 +194,7 @@ impl User<'_> {
             self.unused_ids.push(new_msg_id);
         }
 
-        let output_blocks = User::generate_msg_blocks(&new_message, is_command, new_msg_id, &self.address);
+        let output_blocks = User::<SMSHandlerT>::generate_msg_blocks(&new_message, is_command, new_msg_id, &self.address);
         let num_blocks = output_blocks.len();
 
         if self.is_encrypted {

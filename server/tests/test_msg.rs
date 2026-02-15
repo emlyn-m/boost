@@ -1,4 +1,5 @@
 use boost::user;
+use boost::sms;
 
 use bitvec::prelude::*;
 
@@ -11,7 +12,7 @@ pub fn test_chunking() {
     let tx_payload_bitvec = BitVec::<u8,Lsb0>::from_vec(tx_payload.as_bytes().to_vec());
     let tx_is_command = true;
     let tx_msg_id = 15;
-    let test_blocks = user::User::generate_msg_blocks(&tx_payload_bitvec, tx_is_command, tx_msg_id, &"test_addr".to_string());
+    let test_blocks = user::User::<sms::VoidSMSHandler>::generate_msg_blocks(&tx_payload_bitvec, tx_is_command, tx_msg_id, &"test_addr".to_string());
     let n_blocks = test_blocks.len();
 
     let mut cursor = 0;

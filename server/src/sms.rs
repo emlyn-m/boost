@@ -6,13 +6,18 @@ use log::{info, warn};
 
 use crate::block;
 
-pub struct SMSHandler {
+pub trait HandleSMS {
+    fn send_block(&self, target: &str, content: &block::Block);
+    fn recv_block(&self) -> Option<block::Block>;
+}
+
+pub struct SocketSMSHandler {
 	sock: UnixDatagram,
 	sock_in_path: PathBuf,
 	sock_out_path: PathBuf,
 }
 
-impl Drop for SMSHandler {
+impl Drop for SocketSMSHandler {
 	fn drop(&mut self) {
 		if self.sock_in_path.exists() { let _ = fs::remove_file(&self.sock_in_path); }
 		if self.sock_out_path.exists() { let _ = fs::remove_file(&self.sock_out_path); }
@@ -20,8 +25,8 @@ impl Drop for SMSHandler {
 }
 
 
-impl SMSHandler {
-	pub fn new(sock_in_path: &std::path::Path, sock_out_path: &std::path::Path) -> anyhow::Result<SMSHandler> {
+impl SocketSMSHandler {
+	pub fn new(sock_in_path: &std::path::Path, sock_out_path: &std::path::Path) -> anyhow::Result<SocketSMSHandler> {
 	    if sock_in_path.exists() { 
 	    	match fs::remove_file(&sock_in_path) {
 	     		Ok(()) => (),
@@ -39,15 +44,18 @@ impl SMSHandler {
 		// sock.connect(sock_out_path)?;
 	    sock.set_nonblocking(true)?;
 					
-		Ok(SMSHandler { 
+		Ok(SocketSMSHandler { 
 			sock: sock,
 			sock_in_path: sock_in_path.to_owned(),
 			sock_out_path: sock_out_path.to_owned()
 
 		})
 	}
+}
 
-	pub fn send_block(&self, target: &str, content: &block::Block) {
+impl HandleSMS for SocketSMSHandler {
+
+	fn send_block(&self, target: &str, content: &block::Block) {
 	
 		info!("Sending block {} to target {}", &content.data.clone(), target);
 		let resp = self.sock.send_to(content.data.as_raw_slice(), &self.sock_out_path);
@@ -57,7 +65,7 @@ impl SMSHandler {
 		}	
 	}
 	
-	pub fn recv_block(&self) -> Option<block::Block> {
+	fn recv_block(&self) -> Option<block::Block> {
 		
 		
 		let mut buf = vec![0; 140];
@@ -70,4 +78,10 @@ impl SMSHandler {
 		info!("Received new block of size {}", bytes_read);
 		Some(block::Block::new( "ph_null".to_string(), BitVec::<u8,Lsb0>::from_vec(buf)  ))
 	}
+}
+
+pub struct VoidSMSHandler {}
+impl HandleSMS for VoidSMSHandler {
+    fn send_block(&self, _target: &str, _content: &block::Block) { panic!("attempt to send with VoidSMSHandler"); }
+    fn recv_block(&self) -> Option<block::Block> { panic!("attempt to recv from VoidSMSHandler"); }
 }

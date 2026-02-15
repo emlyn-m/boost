@@ -33,7 +33,7 @@ pub async fn test_encryption() {
             .unwrap()
     );
     
-    let sms_handler = match sms::SMSHandler::new(std::path::Path::new(SOCK_IN_PATH), std::path::Path::new(SOCK_OUT_PATH)) {
+    let sms_handler = match sms::SocketSMSHandler::new(std::path::Path::new(SOCK_IN_PATH), std::path::Path::new(SOCK_OUT_PATH)) {
         Ok(handler) => handler,
         Err(_) => panic!("failed to create sms handler!")
     };

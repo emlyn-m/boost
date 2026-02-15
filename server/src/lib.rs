@@ -12,6 +12,7 @@ use std::env;
 use log::{error, info, warn};
 use std::sync::Arc;
 use std::collections::HashMap;
+use crate::sms::HandleSMS;
 
 use matrix_sdk;
 use bitvec::prelude::*;
@@ -21,11 +22,11 @@ const SOCK_OUT_PATH: &str = "/home/emlyn/pets/boost/boost_sout.sock";
 const CREDFILE_PATH: &str = "credfile.cfg";
 const HOMESERVER_CREDFILE_PATH: &str = "homeserver_creds.cfg";
 
-pub async fn init(bot_credentials: &Vec::<credential_manager::BridgeBotCredentials>) -> anyhow::Result<(Arc<matrix_sdk::Client>, sms::SMSHandler)> {
+pub async fn init(bot_credentials: &Vec::<credential_manager::BridgeBotCredentials>) -> anyhow::Result<(Arc<matrix_sdk::Client>, sms::SocketSMSHandler)> {
  	env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     env::set_var("RUST_BACKTRACE", "1"); // set backtrace for debugging
 
-    let socket = sms::SMSHandler::new(std::path::Path::new(SOCK_IN_PATH), std::path::Path::new(SOCK_OUT_PATH))?;
+    let socket = sms::SocketSMSHandler::new(std::path::Path::new(SOCK_IN_PATH), std::path::Path::new(SOCK_OUT_PATH))?;
     
     // Load our bot credentials from our credential file
     match credential_manager::load_credential_file(CREDFILE_PATH, bot_credentials) {
@@ -69,7 +70,7 @@ pub async fn run() -> anyhow::Result<()> {
 	let bot_credentials = vec![];
 	let (client, sms_agent) = init(&bot_credentials).await?;
 
-    let mut users: HashMap<String, user::User> = HashMap::new(); // (Phone no., User struct)
+    let mut users: HashMap<String, user::User<sms::SocketSMSHandler>> = HashMap::new(); // (Phone no., User struct)
 
     let mut pending_msgs: Vec::<(String, usize, matrix_message::MatrixMessage)> = vec![]; // (ph number, domain idx, message)
     let mut pending_control_msgs: Vec::<(String, matrix_message::MatrixBotControlMessage)> = vec![]; // (ph number, ctrl message)
@@ -194,7 +195,7 @@ pub async fn run() -> anyhow::Result<()> {
     }
 }
 
-fn send_block_ack(sender: &mut user::User, block_idx: u8, new_block_msgid: u8) {
+fn send_block_ack(sender: &mut user::User<sms::SocketSMSHandler>, block_idx: u8, new_block_msgid: u8) {
     let mut block_ack_payload = bitvec![u8, Lsb0; 0; command::COMMAND_BITLENGTH + 16]; // +8 for msgId, +8 for blockIdx
     block_ack_payload[0..command::COMMAND_BITLENGTH].store::<command::CommandInt>(command::CommandValue::BlockAck as command::CommandInt);
     block_ack_payload[command::COMMAND_BITLENGTH..command::COMMAND_BITLENGTH + 8].store::<u8>(new_block_msgid); 
@@ -203,14 +204,14 @@ fn send_block_ack(sender: &mut user::User, block_idx: u8, new_block_msgid: u8) {
 }
 
 // Wrapper function to User.send_message for commands
-fn send_command(sender: &mut user::User, command_type: command::CommandInt, payload: &mut BitVec::<u8,Lsb0>, needs_ack: bool) {
+fn send_command(sender: &mut user::User<sms::SocketSMSHandler>, command_type: command::CommandInt, payload: &mut BitVec::<u8,Lsb0>, needs_ack: bool) {
     let mut new_payload = bitvec![u8, Lsb0; 0; command::COMMAND_BITLENGTH];
     new_payload[0..command::COMMAND_BITLENGTH].store::<command::CommandInt>(command_type);
     new_payload.append(payload);
     sender.send_message(new_payload, true, needs_ack);
 }
 
-fn process_message(sender: &mut user::User, msg_id: u8, bot_credentials: &Vec::<credential_manager::BridgeBotCredentials>) {
+fn process_message(sender: &mut user::User<sms::SocketSMSHandler>, msg_id: u8, bot_credentials: &Vec::<credential_manager::BridgeBotCredentials>) {
 
     let msg = sender.messages.get(&msg_id).expect("Failed to get message while processing");
     info!("Received message, processing");

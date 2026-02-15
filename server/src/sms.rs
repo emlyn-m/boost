@@ -67,10 +67,10 @@ impl HandleSMS for SocketSMSHandler {
 		    Ok(n) => n,
 			Err(_e) => { return None; }
 		};
-				
+
 		// todo: some way to get addr
 		info!("Received new block of size {}", bytes_read);
-		Some(block::Block::new( "ph_null".to_string(), BitVec::<u8,Lsb0>::from_vec(buf)  ))
+		Some(block::Block::new( "ph_null".to_string(), BitVec::<u8,Lsb0>::from_vec(buf[..bytes_read].to_vec()) ))
 	}
 }
 

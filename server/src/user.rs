@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::Arc;
-use log::info;
+use log::{info, warn};
 
 
 const MESSAGE_KEEPFOR_DURATION_MS: u128 = 10*1000;  // Tunable!! 10s is proooobably too low but good for testing :p
@@ -230,7 +230,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
 
         let other_public_bytes = match <&[u8] as TryInto<[u8;32]>>::try_into(msg.as_raw_slice()) {
             Ok(v) => v,
-            Err(_) => return Err("Bad sized key")
+            Err(_) => { warn!("rx key of size {}", msg.len() / 8); return Err("Bad sized key"); }
         };
         
     

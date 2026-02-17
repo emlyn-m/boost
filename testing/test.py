@@ -111,9 +111,13 @@ class Cli:
             # Data type message
             data_vals = bsdata.unpack(Message.PAYLOAD_PATTERN_DAT)
 
-            sender_idx = int(data_vals[0], 16)
-            platform_idx = int(data_vals[1], 16)
-            msg_content = data_vals[2].replace("\x00", "")
+            try:
+                sender_idx = data_vals[0]
+                platform_idx = data_vals[1]
+                msg_content = data_vals[2].replace("\x00", "")
+            except Exception as e:
+                self.display(f'Error processing data message - {e}\t(data was {data_vals})', lvl='err')
+                return
 
             self.display("Received new message:", lvl="prod")
             self.display(f"\tSender: {self.agent.users[platform_idx][sender_idx]} ({sender_idx})", lvl="prod")

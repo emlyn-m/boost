@@ -107,41 +107,44 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
 
     // receive block through sms
     pub fn receive_block(&mut self, new_block: &mut block::Block) -> (block::BlockReceivedAction, u8) { // return s and action and (in all instances - the block index)
-
         let msg_id = new_block.data.get(block::BLOCK_MSGID_RANGE).unwrap().load::<u8>();
         let is_multipart = new_block.data.get(block::BLOCK_ISMLP_RANGE).unwrap().load::<u8>() == 1;
         let block_idx = if is_multipart { new_block.data.get(block::BLOCK_MPIDX_RANGE).unwrap().load::<u8>() } else { 0 };
-        
 
-        if !self.messages.contains_key(&msg_id) {
-            self.messages.insert(msg_id, message::Message::new(new_block));
-
-            if !is_multipart {
-                // Check if this block is a BlockAck
-                let block_command = new_block.data.get(block::BLOCK_SPCOM_RANGE).unwrap().load::<u8>();
-                if block_command == command::CommandValue::BlockAck as command::CommandInt {
-                    return (block::BlockReceivedAction::ProcessNoAck, block_idx);
-                }
+        if !is_multipart {
+            // Check if this block is a BlockAck
+            let block_command = new_block.data.get(block::BLOCK_SPCOM_RANGE).unwrap().load::<u8>();
+            if block_command == command::CommandValue::BlockAck as command::CommandInt {
+                return (block::BlockReceivedAction::ProcessNoAck, block_idx);
             }
-            
+        }
+        
+        if !self.messages.contains_key(&msg_id) {
+            // new msg_id
+            self.messages.insert(msg_id, message::Message::new(new_block));
         } else {
             if !is_multipart {
                 // single part message - already received
                 let current_time = std::time::Instant::now();
                 if (current_time.duration_since(self.messages.get(&msg_id).expect("msg_id should! be present for fetching time").received_at)).as_millis() > MESSAGE_KEEPFOR_DURATION_MS {
                     self.messages.remove(&msg_id);  // Old message, no need to keep
+                    self.messages.insert(msg_id, message::Message::new(new_block));
+                } else {
+                    info!("duplicate sp msg {} received with {}ms", &msg_id, &MESSAGE_KEEPFOR_DURATION_MS);
                 }
-                return (block::BlockReceivedAction::SendBlockAck, 0);
             } else if self.messages.get(&msg_id).unwrap().stored_blocks.contains(&block_idx) {
                 // multipart message - this block already received
+                info!("duplicate block {} on mp msg {} received", &block_idx, &msg_id);
                 return (block::BlockReceivedAction::SendBlockAck, block_idx);
+            } else {
+                // multipart msg - new block
+                self.messages.get_mut(&msg_id).expect("could not retrieve message to insert new block in user::receive_block").add_block(new_block);
             }
-
-            self.messages.get_mut(&msg_id).expect("could not retrieve message to insert new block in user::receive_block").add_block(new_block);
         }
         
 
         if self.messages.get(&msg_id).unwrap().is_complete {
+            info!("message {} complete", msg_id);
             (block::BlockReceivedAction::ProcessMessage, 0)
         } else {
             (block::BlockReceivedAction::SendBlockAck, block_idx)

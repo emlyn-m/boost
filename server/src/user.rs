@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::Arc;
-use log::{info, warn};
+use log::{info, warn, error};
 
 
 const MESSAGE_KEEPFOR_DURATION_MS: u128 = 10*1000;  // Tunable!! 10s is proooobably too low but good for testing :p
@@ -194,7 +194,6 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
 
     // send full message through sms
     pub fn send_message(&mut self, new_message: BitVec::<u8,Lsb0>, is_command: bool, outgoing: bool) {
-        
         let new_msg_id = self.unused_ids.pop().expect("No available id"); // todo: proper error handling
         if !outgoing {
             self.unused_ids.push(new_msg_id);
@@ -265,6 +264,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
             None => return Err(0),
         };
 
+        // todo: we need to fix this (potentialy in acknowledge_block) to treat data msgs differently
         let full_message_acked = msg_obj.acknowledge_block(&block_id);
         match full_message_acked {
             Some(cmd_type) => {
@@ -273,7 +273,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
 
                 let cmd_type_u = match cmd_type.try_into() {
                     Ok(x) => x,
-                    Err(e) => panic!("{}", e)
+                    Err(_) => { error!("unknown cmd_type - {}", cmd_type); return Err(0); }
                 };
 
                 // special cases
@@ -328,6 +328,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
         executor::block_on(new_bot.initialize_channels());
 
         tokio::spawn(async move {
+            new_bot.init().await;
             new_bot.main_loop().await;
         });
         

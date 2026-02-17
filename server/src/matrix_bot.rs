@@ -27,6 +27,7 @@ pub struct MatrixBotInfo {
 
 pub struct MatrixBot {
     pub client: Arc<Client>,
+    pub sender_addr: String,
     pub bot_address: String,
     pub platform: String, // used for determining how to format the message (appservice name)
     dm_space: matrix_sdk::room::Room,
@@ -37,12 +38,13 @@ pub struct MatrixBot {
 
 impl MatrixBot {
     pub fn new(client: Arc<Client>, bot_address: String, platform: String, dm_space_name: String, admin_room_id: String, channels: MatrixBotChannels) -> MatrixBot {
-
+        let sender_addr = client.user_id().expect("client without userid!").to_owned().to_string();
         let dm_space_id = ruma::RoomId::parse(&dm_space_name.as_str()).expect(&format!("Failed to create room ID {}", dm_space_name).as_str());
         let dm_space = (&*client).get_room(&dm_space_id).expect(format!("Failed to get dm room (ID: {})", dm_space_id).as_str());
 
         let mbot = MatrixBot {
             client,
+            sender_addr,
             bot_address,
             platform,
             dm_space,
@@ -97,41 +99,50 @@ impl MatrixBot {
             });
 
         }
-
     }
 
-
-    pub async fn main_loop(&mut self) {
+    pub async fn init(&mut self) {
         // todo: setup more listeners
-
 
         // create event handlers
         for i in 0..self.channels.len() {
             let room_tx_channel = self.internal_channels.0.clone();
+            let ctrl_tx_channel = self.internal_channels.2.clone();
     
             let room_idx = i.clone();
             let room_dn = self.channels[i].display_name.clone();
+            let self_addr = self.sender_addr.clone();
     
             (self.channels[i].room).add_event_handler(move |ev: SyncRoomMessageEvent| async move {
-
+                let sender = ev.sender().as_str().to_owned();
                 let content = match ev {
                     SyncRoomMessageEvent::Original(msg) => msg.content.body().to_string(),
                     SyncRoomMessageEvent::Redacted(_msg) => { info!("todo: Handle redacted events"); return }
                 };
-                
-                let channel_msg = MatrixMessage {
-                    room_idx: room_idx,
-                    display_name: room_dn, // display name of room (todo: should ideally transition to sender dn eventually)
-                    content: content
-                };
-    
-                let _ = room_tx_channel.send(channel_msg);
+
+                if sender == self_addr {
+                    // message from self - we know it was delivered
+                    info!("received self msg - confirmed delivery");
+                    match ctrl_tx_channel.send(MatrixBotControlMessage::MessageSuccess) {
+                        Ok(_) => {},
+                        Err(_) => warn!("failed to send delivery receipt on mbot ctrl channel")
+                    }
+                } else {
+                    match room_tx_channel.send(MatrixMessage {
+                        room_idx: room_idx,
+                        display_name: room_dn, // display name of room (todo: should ideally transition to sender dn eventually)
+                        content: content
+                    }) {
+                        Ok(_) => {},
+                        Err(e) => warn!("mbot failed to send msg on room_tx_channel - {}", e)
+                    };
+                }
             });
         }
+
+    }
     
-
-
-        // main loop
+    pub async fn main_loop(&mut self) {
         loop {
             // poll for command channel messages
             let latest_control_msg = self.internal_channels.3.try_recv();
@@ -168,7 +179,6 @@ impl MatrixBot {
                 info!("sending message {} to {} on platform {}", &latest_msg.content, &target_channel.display_name, &self.platform);
             }
         }
-
     }
 
 }
@@ -186,15 +196,11 @@ pub struct MatrixChannelInfo {
 }
 
 
-
 impl MatrixChannel {
-
     pub fn convert_to_info(&self) -> MatrixChannelInfo {
         return MatrixChannelInfo {
             room_id: self.room_id.clone(),
             display_name: self.display_name.clone(),
         };
     }
-
-
 }

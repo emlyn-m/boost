@@ -103,11 +103,13 @@ pub async fn run() -> anyhow::Result<()> {
             }
         }
         for pending in pending_msgs.drain(..) {
+            info!("received msg on addr {}@{} - sending!", &pending.1, &pending.2.content);
 
             let user = users.get_mut(&pending.0).expect("Failed to get user by pending message addr");
             let mut true_content_vec: Vec::<u8> = pending.2.content.as_bytes().to_vec();
             true_content_vec.insert(0, pending.1.try_into().expect("Failed conversion usize -> u8")); // push platform idx
             true_content_vec.insert(0, pending.2.room_idx.try_into().expect("Failed conversion usize -> u8"));  // push room idx
+
             user.send_message(BitVec::<u8,Lsb0>::from_vec(true_content_vec), false, true);
         }
 

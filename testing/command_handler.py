@@ -1,7 +1,8 @@
+from sender import Sender
+
 import strings
 import secrets
 import x25519
-
 
 class CommandHandler:
     def handle_help(cli, _com):
@@ -23,35 +24,30 @@ class CommandHandler:
 
     def handle_ph(cli, com):
 
+        cph = None
         if com and (len(com.split(" ")) == 2):
             try:
                 cph = com.split(" ")[1]
-                if cph[0] == "+":
-                    int(cph[1:])
-                else:
-                    int(cph)
-                cli.agent = Sender(cph, cli)
+                assert(cph)
             except ValueError:
                 cli.display(strings.PH_INVALID, lvl="err", showlvl=True)
-            return
+                return
+        
+        else:
+            cph = input(strings.PH_INPUT)
+            while not cph:
+                try:
+                    cli.display(strings.PH_INVALID, lvl="err", showlvl=True)
+                    cph = input(strings.PH_INPUT)
+                except KeyboardInterrupt:
+                    quit(127)
 
-        cph = None
-        while True:
-
-            try:
-                cph = input(strings.PH_INPUT)
-                if cph == "+":
-                    cph = cph[1:]
-                int(cph)
-                break
-
-            except KeyboardInterrupt:
-                quit(127)
-
-            except ValueError:
-                cli.display(strings.PH_INVALID, lvl="err", showlvl=True)
+        if not cph in cli.agents:
+            cli.display(f"Creating new user", lvl="prod")
+            cli.agents[cph] = Sender(cph, cli, cli.agent.sock, cli.agent.sock_path)
 
         cli.display(f"Set phone number to [{cph}]", lvl="prod")
+        cli.agent = cli.agents[cph]
         return cph
 
     def handle_init(cli, _com):

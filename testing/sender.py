@@ -6,8 +6,6 @@ from message import Message
 class Sender:
 
     def __init__(self, phone, cli, sock, sock_path):
-        if phone[0] == "+":
-            phone = phone[1:]
         self.phone_number = int(phone)
         self.available_msg_ids = [i for i in range(1<<5)]
 
@@ -37,8 +35,20 @@ class Sender:
             msg = bitstring.pack(Message.OUTGOING_PATTERN_COM, True, False, True, self.msg_id, Message.COMMANDS[command], payload)
 
         
-        msg = msg.tobytes()        
-        self.sock.sendto(msg, self.sock_path)
+        payload = f'+{self.phone_number}'.encode('utf-8') + bytes([0])
+        payload += msg.tobytes()
+        self.sock.sendto(payload, self.sock_path)
+        
+    def recv_msg(self):
+        payload = self.sock.recv(160)
+        payload_offset = 0
+        while payload[payload_offset] != 0:
+            payload_offset += 1
+            
+        _sender = payload[:payload_offset]
+        data = payload[payload_offset+1:]
+        
+        return data
 
     def encrypt_msg(self, msg_str):
         return msg_str

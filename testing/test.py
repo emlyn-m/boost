@@ -27,8 +27,10 @@ class Cli:
         self.display(strings.INFO_MSG, showlvl=False)
 
         self.sock = sock
-        self.agent = Sender(''.join([ random.choice('123456789') for _ in range(10) ]), self, self.sock, sock_out_path )
-        self.display(f'{strings.PH_INPUT} { self.agent.phone_number }', showlvl=False)
+        phone_number = ''.join([ random.choice('123456789') for _ in range(10) ])
+        self.agents = { phone_number:  Sender( phone_number, self, self.sock, sock_out_path ) }
+        self.agent = self.agents[phone_number]
+        self.display(f'{strings.PH_INPUT} { phone_number }', showlvl=False)
 
 
     def display(self, msg, lvl="prod", endl="\n", showlvl=True, escape=False):
@@ -52,7 +54,7 @@ class Cli:
 
     def mainloop(self):
         try:
-            payload = self.sock.recv(140)
+            payload = self.agent.recv_msg()
             self.preprocess_msg(payload)
         except BlockingIOError:
             pass

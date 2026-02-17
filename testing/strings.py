@@ -14,9 +14,9 @@ HELP_MSG = "\
 \x1b[1m                         \x1b[38;5;203m.lsusers [domain]\x1b[0m  List all users and their indices on [domain]\n\
 \x1b[1m                               \x1b[38;5;203m.reqdomains\x1b[0m  Request an updated list of domains from the server\n\
 \x1b[1m                        \x1b[38;5;203m.requsers [domain]\x1b[0m  Request an updated list of users and indices on [domain]\n\
-\x1b[1m                    \x1b[38;5;203m.logout [domain index]\x1b[0m  Sign out of platform [domain index]\n\
-\x1b[1m                 \x1b[38;5;203m.revokeall [domain index]\x1b[0m  Sign out of platform [domain index] on all clients\n\
-\x1b[1m       \x1b[38;5;203mfinduser [domain index] [user name]\x1b[0m  Find user with name [user name] on [domain index]\n\
+\x1b[1m                    \x1b[38;5;203m.logout [domain index]\x1b[0m  Sign out of domain [domain index]\n\
+\x1b[1m                 \x1b[38;5;203m.revokeall [domain index]\x1b[0m  Sign out of domain [domain index] on all clients\n\
+\x1b[1m         \x1b[38;5;203m.finduser [domain index] [handle]\x1b[0m  Find user with handle [handle] on domain [domain index]\n\
 "
  
 PH_INPUT = "\x1b[1m\x1b[38;5;218m ph# \x1b[0m "

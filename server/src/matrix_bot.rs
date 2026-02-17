@@ -109,7 +109,6 @@ impl MatrixBot {
             let ctrl_tx_channel = self.internal_channels.2.clone();
     
             let room_idx = i.clone();
-            let room_dn = self.channels[i].display_name.clone();
             let self_addr = self.self_addr.clone();
     
             (self.channels[i].room).add_event_handler(move |ev: SyncRoomMessageEvent| async move {

@@ -77,7 +77,7 @@ class Cli:
             is_mp_first = data_vals[0]
             is_command = data_vals[2]
             block_id = int(payload[:2], 16)
-            actual_payload = payload[2:]
+            actual_payload = self.agent.decrypt_msg(payload[2:])
 
             if msg_id not in self.agent.outstanding_mp_msgs:
                 self.agent.outstanding_mp_msgs[msg_id] = PartialMessage(msg_id)
@@ -95,7 +95,7 @@ class Cli:
 
         else:
             is_command = data_vals[2]
-            processableMsg = payload
+            processableMsg = self.agent.decrypt_msg(payload)
             command_id = int(payload[:2], 16)
             if not is_command or Message.NEEDS_ACK[Message.COMMANDS_REVERSE[command_id]]:
                 self.agent.send_msg("BlockAck", f'{msg_id:0>2X}' + '00')

@@ -24,7 +24,7 @@ class Sender:
         self.sock = sock
         self.sock_path = sock_path
 
-    def send_msg(self, command, payload):  # todo: multipart support
+    def send_msg(self, command, payload):
         self.msg_id = (self.msg_id + 1) % 32
         self.cli.display(f"Sending msg with id {self.msg_id}", lvl="debug")
         
@@ -41,9 +41,9 @@ class Sender:
             is_multipart = True
             for block_offset in range(0, len(raw_payload), 139):
                 block_end = min(block_offset + 139, len(raw_payload))
-                block_payloads.append(raw_payload[block_offset:block_end].hex())
+                block_payloads.append(self.encrypt_msg(raw_payload[block_offset:block_end]).hex())
         else:
-            block_payloads.append(raw_payload.hex())
+            block_payloads.append(self.encrypt_msg(raw_payload).hex())
         
         phone_number_header = self.phone_number.encode('utf-8') + bytes([0])
         for i, block_payload in enumerate(block_payloads):
@@ -65,8 +65,10 @@ class Sender:
         
         return data
 
-    def encrypt_msg(self, msg_str):
-        return msg_str
+    def encrypt_msg(self, msg_bytes):
+        print(f'encrypting object of type {msg_bytes}')
+        return msg_bytes
 
-    def decrypt_msg(self, msg_str):
-        return msg_str
+    def decrypt_msg(self, msg_hex):
+        print(f'decrypting object of type {msg_hex}')
+        return msg_hex

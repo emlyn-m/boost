@@ -486,9 +486,6 @@ fn process_message(sender: &mut user::User<sms::SocketSMSHandler>, msg_id: u8, b
             }
         }
 
-        // todo: send some reply, but that's going to need async stuff and depends on how the matrix crate we use handles that
-        //      i should really set up a homeserver soon for testing     YIPPEE I HAVE A HOMESERVER    
-        // we can send a reply by a blocking call to the control channel, waiting for a MatrixControlMessage::MsgSendStatus which contains a result and evaluating that
         
     }
 

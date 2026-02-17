@@ -27,7 +27,7 @@ pub struct MatrixBotInfo {
 
 pub struct MatrixBot {
     pub client: Arc<Client>,
-    pub sender_addr: String,
+    pub self_addr: String,
     pub bot_address: String,
     pub platform: String, // used for determining how to format the message (appservice name)
     dm_space: matrix_sdk::room::Room,
@@ -38,13 +38,13 @@ pub struct MatrixBot {
 
 impl MatrixBot {
     pub fn new(client: Arc<Client>, bot_address: String, platform: String, dm_space_name: String, admin_room_id: String, channels: MatrixBotChannels) -> MatrixBot {
-        let sender_addr = client.user_id().expect("client without userid!").to_owned().to_string();
+        let self_addr = client.user_id().expect("client without userid!").to_owned().to_string();
         let dm_space_id = ruma::RoomId::parse(&dm_space_name.as_str()).expect(&format!("Failed to create room ID {}", dm_space_name).as_str());
         let dm_space = (&*client).get_room(&dm_space_id).expect(format!("Failed to get dm room (ID: {})", dm_space_id).as_str());
 
         let mbot = MatrixBot {
             client,
-            sender_addr,
+            self_addr,
             bot_address,
             platform,
             dm_space,
@@ -84,7 +84,7 @@ impl MatrixBot {
                         matrix_sdk::RoomDisplayName::Named(name) => name,
                         matrix_sdk::RoomDisplayName::Aliased(name) => name,
                         matrix_sdk::RoomDisplayName::Calculated(name) => name,
-                        matrix_sdk::RoomDisplayName::EmptyWas(_former_name) => continue, // Abort - Left room, no use TODO should probably handle this earlier
+                        matrix_sdk::RoomDisplayName::EmptyWas(_former_name) => continue, // Abort - Left room, no use
                         matrix_sdk::RoomDisplayName::Empty => "[Unnamed room]".to_string()
                     },
                     None => "[Unnamed room]".to_string()
@@ -102,8 +102,7 @@ impl MatrixBot {
     }
 
     pub async fn init(&mut self) {
-        // todo: setup more listeners
-
+        // listeners
         // create event handlers
         for i in 0..self.channels.len() {
             let room_tx_channel = self.internal_channels.0.clone();
@@ -111,13 +110,13 @@ impl MatrixBot {
     
             let room_idx = i.clone();
             let room_dn = self.channels[i].display_name.clone();
-            let self_addr = self.sender_addr.clone();
+            let self_addr = self.self_addr.clone();
     
             (self.channels[i].room).add_event_handler(move |ev: SyncRoomMessageEvent| async move {
                 let sender = ev.sender().as_str().to_owned();
                 let content = match ev {
                     SyncRoomMessageEvent::Original(msg) => msg.content.body().to_string(),
-                    SyncRoomMessageEvent::Redacted(_msg) => { info!("todo: Handle redacted events"); return }
+                    SyncRoomMessageEvent::Redacted(_msg) => { info!("redacted event - skipping"); return }
                 };
 
                 if sender == self_addr {
@@ -130,7 +129,7 @@ impl MatrixBot {
                 } else {
                     match room_tx_channel.send(MatrixMessage {
                         room_idx: room_idx,
-                        display_name: room_dn, // display name of room (todo: should ideally transition to sender dn eventually)
+                        display_name: sender,
                         content: content
                     }) {
                         Ok(_) => {},

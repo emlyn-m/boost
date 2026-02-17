@@ -123,7 +123,6 @@ class Cli:
             self.display(f"\tSender: {self.agent.users[platform_idx][sender_idx]} ({sender_idx})", lvl="prod")
             self.display(f"\tPlatform: {self.agent.domains[platform_idx]} ({platform_idx})", lvl="prod")
             self.display(f"\tContent: {msg_content}", lvl="prod")
-            # todo: add block ack
 
         else:
             # Command type message

@@ -265,7 +265,6 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
             None => { info!("non-exist acc for msgid {}", &msg_id); return Err(0); }
         };
 
-        // todo: we need to fix this (potentialy in acknowledge_block) to treat data msgs differently
         let full_message_acked = msg_obj.acknowledge_block(block_id);
         let mut should_remove = false;
         match full_message_acked {

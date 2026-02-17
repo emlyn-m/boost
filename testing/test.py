@@ -71,7 +71,7 @@ class Cli:
 
         msg_id = data_vals[3]
 
-        if data_vals[1]:
+        if data_vals[1]:  # multipart
             is_mp_first = data_vals[0]
             is_command = data_vals[2]
             block_id = int(payload[:2], 16)
@@ -95,7 +95,7 @@ class Cli:
             is_command = data_vals[2]
             processableMsg = payload
             command_id = int(payload[:2], 16)
-            if Message.NEEDS_ACK[Message.COMMANDS_REVERSE[command_id]]:
+            if not is_command or Message.NEEDS_ACK[Message.COMMANDS_REVERSE[command_id]]:
                 self.agent.send_msg("BlockAck", f'{msg_id:0>2X}' + '00')
 
         if processableMsg:
@@ -114,7 +114,7 @@ class Cli:
             try:
                 sender_idx = data_vals[0]
                 platform_idx = data_vals[1]
-                msg_content = data_vals[2].replace("\x00", "")
+                msg_content = bytes.fromhex(data_vals[2].replace("\x00", "")).decode('utf-8')
             except Exception as e:
                 self.display(f'Error processing data message - {e}\t(data was {data_vals})', lvl='err')
                 return
@@ -123,6 +123,7 @@ class Cli:
             self.display(f"\tSender: {self.agent.users[platform_idx][sender_idx]} ({sender_idx})", lvl="prod")
             self.display(f"\tPlatform: {self.agent.domains[platform_idx]} ({platform_idx})", lvl="prod")
             self.display(f"\tContent: {msg_content}", lvl="prod")
+            # todo: add block ack
 
         else:
             # Command type message

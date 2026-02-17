@@ -386,7 +386,7 @@ fn process_message(sender: &mut user::User<sms::SocketSMSHandler>, msg_id: u8, b
              }
 
             command::CommandValue::BlockAck => { 
-                info!("rx blockack on {}", sender.address);
+                info!("Received block_ack on address {}", sender.address);
 
                 let block_ack_send_result = sender.process_block_ack(&actual_payload); 
                 match block_ack_send_result {

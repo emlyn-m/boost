@@ -131,25 +131,25 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
                     self.messages.remove(&msg_id);  // Old message, no need to keep
                     self.messages.insert(msg_id, message::Message::new(new_block));
                 } else {
-                    info!("duplicate sp msg {} received with {}ms", &msg_id, &MESSAGE_KEEPFOR_DURATION_MS);
+                    info!("Duplicate singlepart message (id {}) received within {}ms - skipping", &msg_id, &MESSAGE_KEEPFOR_DURATION_MS);
                 }
             } else if self.messages.get(&msg_id).unwrap().stored_blocks.contains(&block_idx) {
                 // multipart message - this block already received
-                info!("duplicate block {} on mp msg {} received", &block_idx, &msg_id);
+                info!("Duplicate block {} on msg {} received", &block_idx, &msg_id);
                 return (block::BlockReceivedAction::SendBlockAck, block_idx);
             } else {
                 // multipart msg - new block
-                info!("new multipart block {} on msg {}", &block_idx, &msg_id);
+                info!("New block {} on msg {}", &block_idx, &msg_id);
                 self.messages.get_mut(&msg_id).expect("could not retrieve message to insert new block in user::receive_block").add_block(new_block);
             }
         }
         
 
         if self.messages.get(&msg_id).unwrap().is_complete {
-            info!("message {} complete", &msg_id);
+            info!("Message {} complete", &msg_id);
             (block::BlockReceivedAction::ProcessMessage, 0)
         } else {
-            info!("message {} partial - acking block", &msg_id);
+            info!("Message {} partial - sending block ack", &msg_id);
             (block::BlockReceivedAction::SendBlockAck, block_idx)
         }
                 
@@ -254,7 +254,6 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
     pub fn process_block_ack(&mut self, msg: &BitVec<u8,Lsb0>) -> Result<(), u8> {
         // extract msg_id and block_id
         let msg_id = msg.get(0..8).unwrap().load::<u8>(); // no error handling needed - any incoming messages have been validated as min 1 bytes
-        warn!("blockacc for msgid {}", &msg_id);
         let block_id = match msg.get(8..16) {
             Some(v) => v,
             None => return Err(1),

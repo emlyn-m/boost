@@ -82,7 +82,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
                     failed_outgoing.push(*outgoing_id);
                 }
                 for (_block_id, block) in &outgoing_msg.stored_blocks {
-                    self.sms_handler.send_block(&self.address.as_str(), block);
+                    if let Some(block) = block { self.sms_handler.send_block(&self.address.as_str(), block); }
                 }
             }
         }
@@ -212,12 +212,13 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
         if outgoing {
             let command_type: command::CommandInt = match is_command {
                 true => new_message.get(0..8).unwrap().load::<u8>(),
-                false => 255 as command::CommandInt
+                false => command::CommandValue::Data as command::CommandInt
             };
             let ack_data = match command_type.try_into() {
                 Ok(command::CommandValue::ChannelUpdate) => new_message.get(8..16).unwrap().load::<u8>(), // byte 2 (channel id)
                 _ => 0,
             };
+            info!("flagging msg {} as outgoing", &new_msg_id);
             self.outgoing_messages.insert(new_msg_id, outgoing_message::OutgoingMessage::new(command_type, ack_data, &output_blocks));
         }
 
@@ -253,23 +254,25 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
     pub fn process_block_ack(&mut self, msg: &BitVec<u8,Lsb0>) -> Result<(), u8> {
         // extract msg_id and block_id
         let msg_id = msg.get(0..8).unwrap().load::<u8>(); // no error handling needed - any incoming messages have been validated as min 1 bytes
+        warn!("blockacc for msgid {}", &msg_id);
         let block_id = match msg.get(8..16) {
             Some(v) => v,
             None => return Err(1),
         }.load::<u8>();
 
-        let mut binding = self.outgoing_messages.clone();
-        let msg_obj = match binding.get_mut(&msg_id) {
+        let msg_obj = match self.outgoing_messages.get_mut(&msg_id) {
             Some(v) => v,
-            None => return Err(0),
+            None => { info!("non-exist acc for msgid {}", &msg_id); return Err(0); }
         };
 
         // todo: we need to fix this (potentialy in acknowledge_block) to treat data msgs differently
-        let full_message_acked = msg_obj.acknowledge_block(&block_id);
+        let full_message_acked = msg_obj.acknowledge_block(block_id);
+        let mut should_remove = false;
         match full_message_acked {
             Some(cmd_type) => {
                 self.unused_ids.push(msg_id);
-                self.outgoing_messages.remove(&msg_id);
+                // self.outgoing_messages.remove(&msg_id);
+                should_remove = true;
 
                 let cmd_type_u = match cmd_type.try_into() {
                     Ok(x) => x,
@@ -283,12 +286,13 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
                     },
                     command::CommandValue::ChannelUpdate => {
                         self.client_has_latest_channel_list[msg_obj.ack_data as usize] = true;
-                    }
+                    },
                     _ => {}
                 }
             },
             None => {}
         }
+        if should_remove { self.outgoing_messages.remove(&msg_id); }
 
         Ok(())
     }

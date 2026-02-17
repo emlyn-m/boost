@@ -23,6 +23,7 @@ pub enum CommandValue {
     ChannelUpdate = 16, // response to RequestKnownUsers
 
     // message related
+    DeliverySuccess = 21,  // used to signal a message has been totally delivered
     UnknownDomain = 5, // (used as a response to DAT [ user_idx@domain_idx payload ])
     TargetUserNotFound = 6,
     FindUser = 19, // Find a user by their remote id, add to known_users
@@ -32,6 +33,9 @@ pub enum CommandValue {
     Error = 8,
     InvalidCommand = 9,
     BlockAck = 11,
+    
+    // internal only
+    Data = 255,
 }
 
 impl std::convert::TryFrom<u8> for CommandValue {
@@ -51,6 +55,7 @@ impl std::convert::TryFrom<u8> for CommandValue {
         else if command_value == CommandValue::DomainUpdate as CommandInt {  Ok(CommandValue::DomainUpdate) }
         else if command_value == CommandValue::ChannelUpdate as CommandInt {  Ok(CommandValue::ChannelUpdate) }
 
+        else if command_value == CommandValue::DeliverySuccess as CommandInt { Ok(CommandValue::DeliverySuccess) }
         else if command_value == CommandValue::UnknownDomain as CommandInt {  Ok(CommandValue::UnknownDomain) }
         else if command_value == CommandValue::TargetUserNotFound as CommandInt {  Ok(CommandValue::TargetUserNotFound) }
         else if command_value == CommandValue::FindUser as CommandInt {  Ok(CommandValue::FindUser) }
@@ -60,6 +65,8 @@ impl std::convert::TryFrom<u8> for CommandValue {
         else if command_value == CommandValue::Error as CommandInt {  Ok(CommandValue::Error) }
         else if command_value == CommandValue::InvalidCommand as CommandInt {  Ok(CommandValue::InvalidCommand) }
         else if command_value == CommandValue::BlockAck as CommandInt { Ok(CommandValue::BlockAck) }
+        
+        else if command_value == CommandValue::Data as CommandInt { Ok(CommandValue::Data) }
         else { Err("Unknown command") }
     }
 }

@@ -28,6 +28,7 @@ class Sender:
 
     def send_msg(self, command, payload):  # todo: multipart support
         self.msg_id = (self.msg_id + 1) % 32
+        self.cli.display(f"Sending msg with id {self.msg_id}", lvl="debug")
 
         msg = None
         if command == "DAT":

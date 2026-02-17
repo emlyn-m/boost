@@ -142,8 +142,8 @@ pub async fn run() -> anyhow::Result<()> {
                         
                     }
                     info!("tx channel_update");
-                    send_command(&mut requesting_user, command::CommandValue::ChannelUpdate as command::CommandInt, updated_channel_data, false); 
-                    requesting_user.client_has_latest_channel_list[domain_idx as usize] = true;
+                    send_command(&mut requesting_user, command::CommandValue::ChannelUpdate as command::CommandInt, updated_channel_data, true); 
+                    requesting_user.client_has_latest_channel_list[domain_idx as usize] = false;
                 },
 
                 _ => { error!("rx unsupported mbot_ctrl from bot"); }
@@ -386,7 +386,7 @@ fn process_message(sender: &mut user::User<sms::SocketSMSHandler>, msg_id: u8, b
              }
 
             command::CommandValue::BlockAck => { 
-            info!("rx blockack on {}", sender.address);
+                info!("rx blockack on {}", sender.address);
 
                 let block_ack_send_result = sender.process_block_ack(&actual_payload); 
                 match block_ack_send_result {

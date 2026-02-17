@@ -19,6 +19,9 @@ class Message:
         "ChannelUpdate": 16,
         "SignOutSuccess": 17,
         "DomainUpdate": 18,
+        "FindUser": 19,
+        "UserFound": 20,
+        "DeliverySuccess": 21,
     }
 
     NEEDS_ACK = {
@@ -40,6 +43,9 @@ class Message:
         "ChannelUpdate": 1,
         "SignOutSuccess": 1,
         "DomainUpdate": 1,
+        "FindUser": 0,
+        "UserFound": 0,
+        "DeliverySuccess": 0,
     }
 
     OUTGOING_PATTERN_COM = "bool, bool, bool, u5, u8, hex"

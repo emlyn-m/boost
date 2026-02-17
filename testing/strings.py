@@ -18,7 +18,7 @@ HELP_MSG = "\
 \x1b[1m                 \x1b[38;5;203m.revokeall [domain index]\x1b[0m  Sign out of platform [domain index] on all clients\n\
 "
  
-PH_INPUT = "\x1b[38;5;218m ph# \x1b[0m "
-PH_INVALID = "\x1b[38;5;124mInvalid phone number\x1b[0m"
-COMMAND_INPUT = "\n\x1b[38;5;213m inp \x1b[0m "
+PH_INPUT = "\x1b[1m\x1b[38;5;218m ph# \x1b[0m "
+PH_INVALID = "\x1b[1m\x1b[38;5;124mInvalid phone number\x1b[0m"
+COMMAND_INPUT = "\n\x1b[1m\x1b[38;5;213m inp \x1b[0m "
 LOG_COLORS = { "debug": "\x1b[38;5;162m\x1b[1m", "warn": "\x1b[38;5;202m\x1b[1m", "prod": "\x1b[38;5;66m\x1b[1m", "err": "\x1b[38;5;52m\x1b[1m" }

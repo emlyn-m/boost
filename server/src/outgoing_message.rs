@@ -5,7 +5,6 @@ use bitvec::prelude::*;
 use std::collections::HashMap;
 
 
-
 pub const OUTGOING_REFRESH_TIME_MS: u128 = 5*1000;  // every 5 seconds
 pub const MAX_SEND_RETRIES: u32 = 5;
 
@@ -14,7 +13,7 @@ pub struct OutgoingMessage {
     pub msg_type: command::CommandInt,
     pub ack_data: u8,
 
-    pub stored_blocks: HashMap<u8, block::Block>,
+    pub stored_blocks: HashMap<u8, Option<block::Block>>,
     pub last_send_instant: std::time::Instant,
     pub send_attempts: u32,
 }
@@ -30,7 +29,7 @@ impl OutgoingMessage {
             } else { 
                 0 
             };
-            stored_blocks.insert(block_idx, blocks[i].clone());
+            stored_blocks.insert(block_idx, Some(blocks[i].clone()));
         }
 
         let new_outgoing = OutgoingMessage {
@@ -45,9 +44,10 @@ impl OutgoingMessage {
         new_outgoing        
     }
 
-    pub fn acknowledge_block(&mut self, block_idx: &u8) -> Option<command::CommandInt> {
-        self.stored_blocks.remove(block_idx);
-        if self.stored_blocks.len() == 0 {
+    pub fn acknowledge_block(&mut self, block_idx: u8) -> Option<command::CommandInt> {
+        self.stored_blocks.insert(block_idx, None);
+        let remaining = self.stored_blocks.iter().fold(0, |acc, item| match item.1 { Some(_) => acc+1, None => acc } );
+        if remaining == 0 {
             return Some(self.msg_type);
         }
         return None;

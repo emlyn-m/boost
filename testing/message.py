@@ -48,12 +48,13 @@ class Message:
         "DeliverySuccess": 0,
     }
 
-    OUTGOING_PATTERN_COM = "bool, bool, bool, u5, u8, hex"
-    OUTGOING_PATTERN_DAT = "bool, bool, bool, u5, u8, u8, hex"
+    HEADER_PATTERN       = "bool, bool, bool, u5, hex"  # mp_first, is_mp, is_command, msg_id, payload
+    MP_HEADER_PATTERN    = "u8, hex"
+    OUTGOING_PATTERN_COM = "u8, hex"
+    OUTGOING_PATTERN_DAT = "u8, u8, hex"
 
-    INCOMING_PATTERN = "bool, bool, bool, u5, hex"  # mp_first, is_mp, is_command, msg_id, payload
-    PAYLOAD_PATTERN_COM = "u8, hex"  # command_id, payload
-    PAYLOAD_PATTERN_DAT = "u8, u8, hex" # user_id, platform_id, payload
+    PAYLOAD_PATTERN_COM  = "u8, hex"  # command_id, payload
+    PAYLOAD_PATTERN_DAT  = "u8, u8, hex" # user_id, platform_id, payload
 
     def __init__(msg_id, f_is_command, f_is_multi, f_is_mp_first):
         pass

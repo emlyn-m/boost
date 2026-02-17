@@ -19,7 +19,6 @@ pub struct HomeserverCredentials {
 }
 
 pub fn load_homeserver_creds(credfile_path: &'static str) -> Result<HomeserverCredentials, String> {
-    // todo: add some point support multiple homeservers
     let contents = match fs::read_to_string(credfile_path) {
         Ok(contents) => contents,
         Err(_) => return Err("Unable to open credential file".to_string())

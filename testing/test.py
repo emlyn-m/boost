@@ -66,7 +66,7 @@ class Cli:
         self.display(f"                bin[0b{bin(int(data.hex(), 16))[2:].zfill(len(data.hex()) * 4)}]", lvl="debug")
 
         bsdata = bitstring.BitArray(data)
-        data_vals = bsdata.unpack(Message.INCOMING_PATTERN)
+        data_vals = bsdata.unpack(Message.HEADER_PATTERN)
 
         payload = data_vals[4]
         processableMsg = None

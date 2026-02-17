@@ -182,6 +182,7 @@ class ResponseCommandHandler:
         domain_idx = int(dat[4:6], 16)
         cli.agent.domains[domain_idx] = cli.agent.domain_reqs[msg_responding_to]
         del cli.agent.domain_reqs[msg_responding_to]
+        cli.display(f'Logged in on domain {domain_idx}', lvl='prod')
 
 
     def recvhandle_chupdate(cli, dat):

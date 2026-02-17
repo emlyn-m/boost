@@ -105,6 +105,7 @@ class Cli:
 
     def receive_msg(self, is_command, payload):
         bsdata = bitstring.BitArray(hex=payload)
+        self.display('', lvl='prod', showlvl=False)
 
         if not is_command:
             # Data type message

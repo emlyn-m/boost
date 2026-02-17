@@ -115,6 +115,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
             // Check if this block is a BlockAck
             let block_command = new_block.data.get(block::BLOCK_SPCOM_RANGE).unwrap().load::<u8>();
             if block_command == command::CommandValue::BlockAck as command::CommandInt {
+                self.messages.insert(msg_id, message::Message::new(new_block));
                 return (block::BlockReceivedAction::ProcessNoAck, block_idx);
             }
         }
@@ -138,15 +139,17 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
                 return (block::BlockReceivedAction::SendBlockAck, block_idx);
             } else {
                 // multipart msg - new block
+                info!("new multipart block {} on msg {}", &block_idx, &msg_id);
                 self.messages.get_mut(&msg_id).expect("could not retrieve message to insert new block in user::receive_block").add_block(new_block);
             }
         }
         
 
         if self.messages.get(&msg_id).unwrap().is_complete {
-            info!("message {} complete", msg_id);
+            info!("message {} complete", &msg_id);
             (block::BlockReceivedAction::ProcessMessage, 0)
         } else {
+            info!("message {} partial - acking block", &msg_id);
             (block::BlockReceivedAction::SendBlockAck, block_idx)
         }
                 

@@ -211,7 +211,10 @@ fn send_command(sender: &mut user::User<sms::SocketSMSHandler>, command_type: co
 
 fn process_message(sender: &mut user::User<sms::SocketSMSHandler>, msg_id: u8, bot_credentials: &Vec::<credential_manager::BridgeBotCredentials>) {
 
-    let msg = sender.messages.get(&msg_id).expect("Failed to get message while processing");
+    let msg = match sender.messages.get(&msg_id) {
+        Some(msg) => msg,
+        None => { warn!("Failed to get message while processing"); return; }
+    };
     info!("Received message, processing");
 
     if msg.is_command {
@@ -396,7 +399,7 @@ fn process_message(sender: &mut user::User<sms::SocketSMSHandler>, msg_id: u8, b
             }
             
             command::CommandValue::SignOut => {
-            	info!("rx revokeallclients on {}", sender.address);
+            	info!("rx signout on {}", sender.address);
 
                 let bot_index: usize = actual_payload[0].try_into().expect("u8 to usize conversion failed somehow");
                 match sender.revoke_bot(bot_index) {

@@ -170,6 +170,7 @@ def main():
                     _cli.mainloop()
                     time.sleep(1)
                 except KeyboardInterrupt:
+                    print('\x1b[2K\r',end='')
                     try:
                         _cli.user_input()
                     except (EOFError, KeyboardInterrupt):

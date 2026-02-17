@@ -146,6 +146,13 @@ class CommandHandler:
 
     def handle_revoke_all_clients(cli, com):
         cli.display("Error: Unimplemented (RevokeAllClients)", lvl="err")
+        
+    def handle_finduser(cli, com):
+        if not (com and len(com.split(' ')) == 3):
+            cli.display("Incorrect format", lvl='err')
+            return
+        cli.display("Error: Unimplemented (FindUser)", lvl="err")
+
 
 
 
@@ -163,6 +170,7 @@ CommandHandler.COMMAND_PREFIX_FUNCS = {
     ".requsers": CommandHandler.handle_requsers,
     ".logout": CommandHandler.handle_logout,
     ".revokeall": CommandHandler.handle_revoke_all_clients,
+    ".finduser": CommandHandler.handle_finduser,
 }
 
 class ResponseCommandHandler:

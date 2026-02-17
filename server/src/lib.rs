@@ -421,6 +421,12 @@ fn process_message(sender: &mut user::User<sms::SocketSMSHandler>, msg_id: u8, b
                 // todo: implement
                 send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Unimplemented".as_bytes().to_vec()), false);
             }
+            
+            command::CommandValue::FindUser => {
+                info!("rx finduser on {}", sender.address);
+                // todo: implement
+                send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Unimplemented".as_bytes().to_vec()), false);
+            }
 
             _ => { send_command(sender, command::CommandValue::InvalidCommand as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec("Unknown Command".as_bytes().to_vec()), false); }
         }

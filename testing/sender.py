@@ -33,7 +33,7 @@ class Sender:
         else:
             msg_id = self.available_msg_ids[0]
             self.available_msg_ids = self.available_msg_ids[1:]
-        self.cli.display(f"Sending msg with id {msg_id}", lvl="debug")
+        self.cli.display(f"Sending {command} msg with id {msg_id}", lvl="debug")
                 
         raw_payload = None
         if command == 'DAT':
@@ -48,9 +48,9 @@ class Sender:
             is_multipart = True
             for block_offset in range(0, len(raw_payload), 139):
                 block_end = min(block_offset + 139, len(raw_payload))
-                block_payloads.append(self.encrypt_msg(raw_payload[block_offset:block_end]).hex())
+                block_payloads.append(self.encrypt_msg(msg_id, block_offset//139, raw_payload[block_offset:block_end]).hex())
         else:
-            block_payloads.append(self.encrypt_msg(raw_payload).hex())
+            block_payloads.append(self.encrypt_msg(msg_id, 0, raw_payload).hex())
             
         if Message.NEEDS_ACK[command]:
             self.msg_ids_awaiting_ack[msg_id] = ( command, payload, [ False for _ in block_payloads ] )
@@ -77,10 +77,22 @@ class Sender:
         
         return data
 
-    def encrypt_msg(self, msg_bytes):
-        self.cli.display(f'encrypting object of type {type(msg_bytes)}', lvl='debug')
+    def encrypt_msg(self, msg_id, block_id, msg_bytes):
+        if not self.is_enc:
+            return msg_bytes
+
+        if not (msg_id | block_id):
+            return msg_bytes
+            
+        self.cli.display(f'Encrypting object of type {type(msg_bytes)}', lvl='debug')
         return msg_bytes
 
-    def decrypt_msg(self, msg_hex):
-        self.cli.display(f'decrypting object of type {type(msg_hex)}', lvl='debug')
+    def decrypt_msg(self, msg_id, block_id, msg_hex):
+        if not self.is_enc:
+            return msg_hex
+
+        if not (msg_id | block_id):
+            return msg_hex
+            
+        self.cli.display(f'Decrypting object of type {type(msg_hex)}', lvl='debug')
         return msg_hex

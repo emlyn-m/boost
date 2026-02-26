@@ -239,7 +239,14 @@ fn process_message(sender: &mut user::User<sms::SocketSMSHandler>, msg_id: u8, b
 
                 let shared_secret = sender.key_exchange(&actual_payload); 
                 match shared_secret {
-                    Ok(val) => send_command(sender, command::CommandValue::DhkeInit as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(val.to_vec()), false),
+                    Ok(val) => { 
+                        sender.unused_ids = vec![];
+                        for i in 1..1<<5 {
+                            sender.unused_ids.push(i as u8);
+                        }
+                        sender.unused_ids.push(0);
+                        send_command(sender, command::CommandValue::DhkeInit as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(val.to_vec()), false);
+                    }
                     Err(e) => send_command(sender, command::CommandValue::Error as command::CommandInt, &mut BitVec::<u8,Lsb0>::from_vec(e.as_bytes().to_vec()), false),
                 }
                 return;  // need explicit here so we dont fall to the second match statement and send invalid command

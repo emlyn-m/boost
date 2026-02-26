@@ -19,8 +19,13 @@ pub fn test_dhke() {
 
 #[tokio::test]
 #[ignore]
-pub async fn test_encryption() {
+pub async fn test_encryption_skip_00() {
+    // todo: this (encryption skipping when msg:block = 0:0)
+}
 
+#[tokio::test]
+#[ignore]
+pub async fn test_encryption() {
     let homeserver_creds = match credential_manager::load_homeserver_creds(HOMESERVER_CREDFILE_PATH) {
         Ok(creds) => creds,
         Err(_) => panic!("Failed to load homeserver creds in test_enc::test_encryption"),
@@ -51,7 +56,6 @@ pub async fn test_encryption() {
     let enc_block = test_user.encrypt_block(&test_block);
     let dec_block = test_user.decrypt_block(&enc_block);
     assert!(test_payload_bitvec == dec_block.data);
-
 }
 
 #[test]

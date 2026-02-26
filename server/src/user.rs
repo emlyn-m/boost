@@ -62,7 +62,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
             sms_handler,
         };
 
-        for i in 1<<4..1<<5 {
+        for i in 1..1<<5 {
             new_user.unused_ids.push(i as u8);
         }
 
@@ -93,14 +93,12 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
     }
 
     pub fn encrypt_block(&self, block: &block::Block) -> block::Block {
-        // todo: user::encrypt_block
+        // todo: user::encrypt_block        
         return block.clone();
     }
 
     pub fn decrypt_block(&self, block: &block::Block) -> block::Block {
         // todo: user::decrypt_block
-        // let _chain_key = block.data.drain(0..8).collect::<BitVec>().load::<u8>(); // pull first octet (chain index)
-        
         return block.clone();
         
     }

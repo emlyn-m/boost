@@ -151,7 +151,7 @@ pub async fn run() -> anyhow::Result<()> {
         }
 
         // check for recv block
-        let mut new_block = match sms_agent.recv_block() {
+        let new_block = match sms_agent.recv_block() {
             None => { continue; },
             Some(v) => { v }
         };
@@ -170,13 +170,10 @@ pub async fn run() -> anyhow::Result<()> {
         }
 
         let new_block_msgid = new_block.data.get(block::BLOCK_MSGID_RANGE).unwrap().load::<u8>();
+        let new_msg_blockid = if new_block.data.get(block::BLOCK_ISMLP_RANGE).unwrap().load::<u8>() == 1 { new_block.data.get(block::BLOCK_MPIDX_RANGE).unwrap().load::<u8>() } else { 0 };
+        let mut new_block_dec = sender.decrypt_block(new_block_msgid, new_msg_blockid, &new_block);
 
-
-        if sender.is_encrypted {
-            sender.decrypt_block(&new_block);
-        }
-
-        let (action, action_data) = sender.receive_block(&mut new_block);
+        let (action, action_data) = sender.receive_block(&mut new_block_dec);
         match action {
             block::BlockReceivedAction::SendBlockAck => { send_block_ack(sender, action_data, new_block_msgid); },
             block::BlockReceivedAction::BlockInvalid => {

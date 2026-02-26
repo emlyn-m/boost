@@ -51,10 +51,12 @@ pub async fn test_encryption() {
 
     let test_payload = "test_data";
     let test_payload_bitvec = BitVec::<u8,Lsb0>::from_vec(test_payload.as_bytes().to_vec());
-    let test_block = block::Block::new("test_addr".to_string(), test_payload_bitvec.clone());
+    let test_block = block::Block::new("test_addr".to_string(), test_payload_bitvec.clone());    
+    let msg_id = 17;
+    let block_id = 0;
 
-    let enc_block = test_user.encrypt_block(&test_block);
-    let dec_block = test_user.decrypt_block(&enc_block);
+    let enc_block = test_user.encrypt_block(msg_id, block_id, &test_block);
+    let dec_block = test_user.decrypt_block(msg_id, block_id, &enc_block);
     assert!(test_payload_bitvec == dec_block.data);
 }
 

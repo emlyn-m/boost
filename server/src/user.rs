@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::Arc;
-use log::{info, warn, error};
+use log::{info, debug, warn, error};
 
 
 const MESSAGE_KEEPFOR_DURATION_MS: u128 = 10*1000;  // Tunable!! 10s is proooobably too low but good for testing :p
@@ -92,13 +92,17 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
         }
     }
 
-    pub fn encrypt_block(&self, block: &block::Block) -> block::Block {
-        // todo: user::encrypt_block        
+    pub fn encrypt_block(&self, msg_id: u8, block_id: u8, block: &block::Block) -> block::Block {
+        // todo: user::encrypt_block
+        if !self.is_encrypted { return block.clone(); }
+        if (msg_id|block_id) == 0 { debug!("skipping enc due to 0:0"); return block.clone(); }
         return block.clone();
     }
 
-    pub fn decrypt_block(&self, block: &block::Block) -> block::Block {
+    pub fn decrypt_block(&self, msg_id: u8, block_id: u8, block: &block::Block) -> block::Block {
         // todo: user::decrypt_block
+        if !self.is_encrypted { return block.clone(); }
+        if (msg_id|block_id) == 0 { debug!("skipping dec due to 0:0"); return block.clone(); }
         return block.clone();
         
     }
@@ -199,14 +203,13 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
         }
 
         let output_blocks = User::<SMSHandlerT>::generate_msg_blocks(&new_message, is_command, new_msg_id, &self.address);
+        let mut output_blocks_enc: Vec::<block::Block> = vec![];
         let num_blocks = output_blocks.len();
 
-        if self.is_encrypted {
-            for i in 0..num_blocks {
-                self.encrypt_block(&output_blocks[i]);
-            }
-
+        for i in 0..num_blocks {
+            output_blocks_enc.push(self.encrypt_block(new_msg_id, i.try_into().unwrap(), &output_blocks[i]));
         }
+
 
         if outgoing {
             let command_type: command::CommandInt = match is_command {
@@ -218,11 +221,11 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
                 _ => 0,
             };
             info!("flagging msg {} as outgoing", &new_msg_id);
-            self.outgoing_messages.insert(new_msg_id, outgoing_message::OutgoingMessage::new(command_type, ack_data, &output_blocks));
+            self.outgoing_messages.insert(new_msg_id, outgoing_message::OutgoingMessage::new(command_type, ack_data, &output_blocks_enc));
         }
 
         for i in 0..num_blocks {
-            self.sms_handler.send_block(self.address.as_str(), &output_blocks[i]);
+            self.sms_handler.send_block(self.address.as_str(), &output_blocks_enc[i]);
         }
 
     }

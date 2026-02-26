@@ -199,7 +199,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
     pub fn send_message(&mut self, new_message: BitVec::<u8,Lsb0>, is_command: bool, outgoing: bool) {
         let new_msg_id = self.unused_ids.pop().expect("No available id"); // todo: proper error handling
         if !outgoing {
-            self.unused_ids.push(new_msg_id);
+            if new_msg_id != 0 { self.unused_ids.push(new_msg_id); }
         }
 
         let output_blocks = User::<SMSHandlerT>::generate_msg_blocks(&new_message, is_command, new_msg_id, &self.address);
@@ -270,7 +270,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
         let mut should_remove = false;
         match full_message_acked {
             Some(cmd_type) => {
-                self.unused_ids.push(msg_id);
+                if msg_id != 0 { self.unused_ids.push(msg_id); }
                 // self.outgoing_messages.remove(&msg_id);
                 should_remove = true;
 

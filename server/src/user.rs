@@ -132,6 +132,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
                     self.messages.insert(msg_id, message::Message::new(new_block));
                 } else {
                     info!("Duplicate singlepart message (id {}) received within {}ms - skipping", &msg_id, &MESSAGE_KEEPFOR_DURATION_MS);
+                    return (block::BlockReceivedAction::SendBlockAck, block_idx);
                 }
             } else if self.messages.get(&msg_id).unwrap().stored_blocks.contains(&block_idx) {
                 // multipart message - this block already received

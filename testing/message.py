@@ -26,9 +26,9 @@ class Message:
 
     NEEDS_ACK = {
         "DAT": 1,
-        "DhkeInit": 0,
+        "DhkeInit": 1,
         "Unencrypted": 0,
-        "AuthToAcc": 1,  # Not relevant to client sending ACK
+        "AuthToAcc": 1,
         "UnknownDomain": 0,
         "TargetUserNotFound": 0,
         "ReqKnownUsers": 0,
@@ -46,6 +46,30 @@ class Message:
         "FindUser": 0,
         "UserFound": 0,
         "DeliverySuccess": 0,
+    }
+    NO_DELETE_ON_ACK = {
+        "DAT": 0,
+        "DhkeInit": 0,
+        "Unencrypted": 0,
+        "AuthToAcc": 1,
+        "UnknownDomain": 0,
+        "TargetUserNotFound": 0,
+        "ReqKnownUsers": 0,
+        "Error": 0,
+        "InvalidCommand": 0,
+        "DuplicateBlock": 0,
+        "BlockAck": 0,
+        "AuthResult": 0,
+        "RevokeAllClients": 0,
+        "SignOut": 0,
+        "ReqDomains": 0,
+        "ChannelUpdate": 0,
+        "SignOutSuccess": 0,
+        "DomainUpdate": 0,
+        "FindUser": 0,
+        "UserFound": 0,
+        "DeliverySuccess": 0,
+
     }
 
     HEADER_PATTERN       = "bool, bool, bool, u5, hex"  # mp_first, is_mp, is_command, msg_id, payload

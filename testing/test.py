@@ -101,13 +101,12 @@ class Cli:
                 self.agent.send_msg("BlockAck", f'{msg_id:0>2X}' + '00')
 
         if processableMsg:
-            self.receive_msg(is_command, processableMsg)
+            self.receive_msg(msg_id, is_command, processableMsg)
 
 
 
-    def receive_msg(self, is_command, payload):
+    def receive_msg(self, msg_id, is_command, payload):
         bsdata = bitstring.BitArray(hex=payload)
-        self.display('', lvl='prod', showlvl=False)
 
         if not is_command:
             # Data type message
@@ -122,9 +121,10 @@ class Cli:
                 return
 
             self.display("Received new message:", lvl="prod")
-            self.display(f"\tSender: {self.agent.users[platform_idx][sender_idx]} ({sender_idx})", lvl="prod")
-            self.display(f"\tPlatform: {self.agent.domains[platform_idx]} ({platform_idx})", lvl="prod")
-            self.display(f"\tContent: {msg_content}", lvl="prod")
+            self.display(f"  ID: {msg_id}", lvl='prod')
+            self.display(f"  Sender: {self.agent.users[platform_idx][sender_idx]} ({sender_idx})", lvl="prod")
+            self.display(f"  Platform: {self.agent.domains[platform_idx]} ({platform_idx})", lvl="prod")
+            self.display(f"  Content: {msg_content}", lvl="prod")
 
         else:
             # Command type message
@@ -132,11 +132,15 @@ class Cli:
 
             command_type = data_vals[0]
             payload = data_vals[1]
-            self.display(f"Command: {Message.COMMANDS_REVERSE[command_type]}", lvl="prod")
-            self.display(f"Payload:\u00a0<{bytes.fromhex(payload).decode('utf-8', errors='ignore')}>", lvl="prod", escape=True)
+            self.display("Received new command:", lvl="prod")
+            self.display(f"  ID: {msg_id}", lvl='prod')
+            self.display(f"  Command: {Message.COMMANDS_REVERSE[command_type]}", lvl="prod")
+            self.display(f"  Payload:\u00a0<{bytes.fromhex(payload).decode('utf-8', errors='ignore')}>", lvl="prod", escape=True)
 
-
-            if command_type == Message.COMMANDS["DhkeInit"]: # this is silly
+            if Message.COMMANDS_REVERSE[command_type] == 'BlockAck':
+                ResponseCommandHandler.recvhandle_ack(self, payload)
+                
+            if Message.COMMANDS_REVERSE[command_type] == "DhkeInit": # this is silly
                 ResponseCommandHandler.recvhandle_init(self, payload)
 
             elif Message.COMMANDS_REVERSE[command_type] == "AuthResult":

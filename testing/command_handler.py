@@ -1,4 +1,5 @@
 from sender import Sender
+from message import Message
 
 import strings
 import secrets
@@ -51,7 +52,6 @@ class CommandHandler:
         return cph
 
     def handle_init(cli, _com):
-
         cli.agent.enc_secret = secrets.token_bytes(32)
         cli.agent.send_msg("DhkeInit", x25519.scalar_base_mult(cli.agent.enc_secret).hex())
 
@@ -68,7 +68,6 @@ class CommandHandler:
         username = bytes(raw_username, 'utf-8').hex()
         password = bytes(com.split(" ")[3], 'utf-8').hex()
         cli.display("Logging in", lvl="prod")
-        cli.agent.domain_reqs[(cli.agent.msg_id + 1) % 32] = raw_username+"@"+raw_servicename  # ugh  this feels hacky
         
         cli.agent.send_msg("AuthToAcc", service_name + "00" + username + "00" + password)
 
@@ -170,6 +169,24 @@ CommandHandler.COMMAND_PREFIX_FUNCS = {
 }
 
 class ResponseCommandHandler:
+    def recvhandle_ack(cli, dat):
+        # block ack format: [u8 msg_id][u8 blk_id]
+        msg_id = int(dat[:2], 16)
+        block_id = int(dat[2:4], 16)
+        if msg_id in cli.agent.msg_ids_awaiting_ack:
+            if block_id in range(len(cli.agent.msg_ids_awaiting_ack[msg_id][2])):
+                cli.display(f'Received ACK for msg:block {msg_id}:{block_id}', lvl='prod')
+                cli.agent.msg_ids_awaiting_ack[msg_id][2][block_id] = True
+                if all(cli.agent.msg_ids_awaiting_ack[msg_id][2]):
+                    cli.display(f'Fully ACKed msg {msg_id}', lvl='prod')
+                    if not Message.NO_DELETE_ON_ACK[cli.agent.msg_ids_awaiting_ack[msg_id][0]]:
+                        del cli.agent.msg_ids_awaiting_ack[msg_id]
+                    if msg_id != 0:  # msg_id=0 reserved for dhke
+                        cli.agent.available_msg_ids.append(msg_id)
+            else:
+                cli.display(f'Received ACK for OOB block {block_id}/{len(cli.agent.msg_ids_awaiting_ack[msg_id][2])} on msg {msg_id}', lvl='warn')
+        else:
+            cli.display(f'Received unexpected ACK for msg {msg_id}', lvl='warn')
 
     def recvhandle_init(cli, dat):
         server_public = bytes.fromhex(dat[::-1][:64][::-1])
@@ -184,8 +201,9 @@ class ResponseCommandHandler:
 
         msg_responding_to = int(dat[2:4], 16)
         domain_idx = int(dat[4:6], 16)
-        cli.agent.domains[domain_idx] = cli.agent.domain_reqs[msg_responding_to]
-        del cli.agent.domain_reqs[msg_responding_to]
+        (service_name, username, _password) = map(lambda s: bytes.fromhex(s).decode('utf-8'), cli.agent.msg_ids_awaiting_ack[msg_responding_to][1].split('00'))
+        cli.agent.domains[domain_idx] = f'{username}@{service_name}'
+        del cli.agent.msg_ids_awaiting_ack[msg_responding_to]
         cli.display(f'Logged in on domain {domain_idx}', lvl='prod')
 
 

@@ -1,3 +1,7 @@
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
+from cryptography.hazmat.primitives import hashes
+from Crypto.Cipher import ChaCha20
 import bitstring
 bitstring.lsb0 = False
 
@@ -54,8 +58,8 @@ class Sender:
             
         if Message.NEEDS_ACK[command]:
             self.msg_ids_awaiting_ack[msg_id] = ( command, payload, [ False for _ in block_payloads ] )
-        else:
-            self.available_msg_ids.append(msg_id)
+        # else:
+            # self.available_msg_ids.append(msg_id)
         
         phone_number_header = self.phone_number.encode('utf-8') + bytes([0])
         for i, block_payload in enumerate(block_payloads):
@@ -77,6 +81,18 @@ class Sender:
         
         return data
 
+    def get_nonce(self, msg_id, block_id, dir):
+        i = msg_id * 256 + block_id
+        info = dir + i.to_bytes(2, 'big')
+        
+        hkdf = HKDFExpand(
+            algorithm=hashes.SHA256(),
+            length=12,
+            info=info
+        )
+        nonce = hkdf.derive(self.enc_key)
+        return nonce
+    
     def encrypt_msg(self, msg_id, block_id, msg_bytes):
         if not self.is_enc:
             return msg_bytes
@@ -84,8 +100,10 @@ class Sender:
         if not (msg_id | block_id):
             return msg_bytes
             
-        self.cli.display(f'Encrypting object of type {type(msg_bytes)}', lvl='debug')
-        return msg_bytes
+        nonce = self.get_nonce(msg_id, block_id, b"c2s")
+        cipher = ChaCha20.new(key=self.enc_key, nonce=nonce)
+        ciphertext = cipher.encrypt(msg_bytes)
+        return ciphertext
 
     def decrypt_msg(self, msg_id, block_id, msg_hex):
         if not self.is_enc:
@@ -93,6 +111,8 @@ class Sender:
 
         if not (msg_id | block_id):
             return msg_hex
-            
-        self.cli.display(f'Decrypting object of type {type(msg_hex)}', lvl='debug')
-        return msg_hex
+
+        nonce = self.get_nonce(msg_id, block_id, b"s2c")
+        cipher = ChaCha20.new(key=self.enc_key, nonce=nonce)
+        plaintext = cipher.decrypt(bytes.fromhex(msg_hex))
+        return plaintext.hex()

@@ -8,6 +8,9 @@ use crate::matrix_message::{ MatrixMessage, MatrixBotControlMessage };
 use crate::sms;
 use crate::command;
 
+use hkdf::Hkdf;
+use sha2::Sha256;
+use chacha20::{ ChaCha20, KeyIvInit, cipher::StreamCipher };
 use bitvec::prelude::*;
 use x25519_dalek;
 use matrix_sdk::Client;
@@ -92,19 +95,43 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
         }
     }
 
+    fn get_nonce(&self, msg_id: u8, block_id: u8, dir: &str) -> [u8; 12] {
+        let hk = Hkdf::<Sha256>::from_prk(&self.shared_secret).expect("PRK length mismatch with SHA2");
+        let mut nonce = [0u8; 12];
+        let msg_id_u16: u16 = msg_id.try_into().unwrap();
+        let block_id_u16: u16 = block_id.try_into().unwrap();
+        let i = (msg_id_u16 * 256 + block_id_u16) as u16;
+        let mut info = Vec::new();
+        info.extend_from_slice(dir.as_bytes());
+        info.extend_from_slice(&i.to_be_bytes());
+        hk.expand(&info, &mut nonce).expect("Nonce buffer length too large");
+        return nonce;
+    }
+    
     pub fn encrypt_block(&self, msg_id: u8, block_id: u8, block: &block::Block) -> block::Block {
-        // todo: user::encrypt_block
         if !self.is_encrypted { return block.clone(); }
         if (msg_id|block_id) == 0 { debug!("skipping enc due to 0:0"); return block.clone(); }
-        return block.clone();
+        
+        let enc_offset = if block.data.get(block::BLOCK_ISMLP_RANGE).unwrap().load::<u8>() == 1 { 2 } else { 1 };
+        let nonce = self.get_nonce(msg_id, block_id, "s2c");
+        let mut cipher = ChaCha20::new(&self.shared_secret.into(), &nonce.into());
+        let mut buffer = block.data.clone().into_vec();
+        cipher.apply_keystream(&mut buffer[enc_offset..]);
+
+        block::Block::new(block.addr.clone(), BitVec::<u8,Lsb0>::from_vec(buffer.clone()))
     }
 
     pub fn decrypt_block(&self, msg_id: u8, block_id: u8, block: &block::Block) -> block::Block {
-        // todo: user::decrypt_block
         if !self.is_encrypted { return block.clone(); }
         if (msg_id|block_id) == 0 { debug!("skipping dec due to 0:0"); return block.clone(); }
-        return block.clone();
-        
+
+        let dec_offset = if block.data.get(block::BLOCK_ISMLP_RANGE).unwrap().load::<u8>() == 1 { 2 } else { 1 };
+        let nonce = self.get_nonce(msg_id, block_id, "c2s");
+        let mut cipher = ChaCha20::new(&self.shared_secret.into(), &nonce.into());
+        let mut buffer = block.data.clone().into_vec();
+        cipher.apply_keystream(&mut buffer[dec_offset..]);
+
+        block::Block::new(block.addr.clone(), BitVec::<u8,Lsb0>::from_vec(buffer.clone()))
     }
 
     // receive block through sms
@@ -199,7 +226,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
     pub fn send_message(&mut self, new_message: BitVec::<u8,Lsb0>, is_command: bool, outgoing: bool) {
         let new_msg_id = self.unused_ids.pop().expect("No available id"); // todo: proper error handling
         if !outgoing {
-            if new_msg_id != 0 { self.unused_ids.push(new_msg_id); }
+            // if new_msg_id != 0 { self.unused_ids.push(new_msg_id); }
         }
 
         let output_blocks = User::<SMSHandlerT>::generate_msg_blocks(&new_message, is_command, new_msg_id, &self.address);
@@ -270,7 +297,7 @@ impl<SMSHandlerT: sms::HandleSMS> User<'_, SMSHandlerT> {
         let mut should_remove = false;
         match full_message_acked {
             Some(cmd_type) => {
-                if msg_id != 0 { self.unused_ids.push(msg_id); }
+                // if msg_id != 0 { self.unused_ids.push(msg_id); }
                 // self.outgoing_messages.remove(&msg_id);
                 should_remove = true;
 

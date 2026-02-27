@@ -19,7 +19,7 @@
 | Multiple numbers | ✅ ||
 | Arbitrary matrix bots | ✅ |Currently only [mautrix-discord](https://github.com/mautrix/discord) tested|
 | Non-text messages | ❌ | planned |
-| Encryption | ❌ | Key exchange supported, encryption in the works! | |
+| Encryption | ⚠️ | Implemented, but untested | |
 | Sending messages | ✅ ||
 | Receiving messages | ✅ ||
 | Refreshing user list | ✅ ||
@@ -96,10 +96,9 @@ password=plaintext
 ```
 ```
     --------------> | dhke_init
-          block_ack | <--------------
           dhke_init | <--------------
-    --------------> | block_ack
 ```
+*all following msgs are encrypted*
 ```
     --------------> | auth_to_account
           block_ack | <--------------
@@ -210,7 +209,3 @@ password=plaintext
 |--|--|--|--|--|--|
 |`user_id`| 0x00 | 0x08 | 8 | Yes | |
 |`domain_id` | 0x08 | 0x16 | 8 | Yes ||
-
-
-
-

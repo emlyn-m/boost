@@ -52,6 +52,7 @@ class CommandHandler:
         return cph
 
     def handle_init(cli, _com):
+        cli.agent.is_enc = 0
         cli.agent.enc_secret = secrets.token_bytes(32)
         cli.agent.send_msg("DhkeInit", x25519.scalar_base_mult(cli.agent.enc_secret).hex())
 
@@ -181,8 +182,8 @@ class ResponseCommandHandler:
                     cli.display(f'Fully ACKed msg {msg_id}', lvl='prod')
                     if not Message.NO_DELETE_ON_ACK[cli.agent.msg_ids_awaiting_ack[msg_id][0]]:
                         del cli.agent.msg_ids_awaiting_ack[msg_id]
-                    if msg_id != 0:  # msg_id=0 reserved for dhke
-                        cli.agent.available_msg_ids.append(msg_id)
+                    # if msg_id != 0:  # msg_id=0 reserved for dhke
+                    #     cli.agent.available_msg_ids.append(msg_id)
             else:
                 cli.display(f'Received ACK for OOB block {block_id}/{len(cli.agent.msg_ids_awaiting_ack[msg_id][2])} on msg {msg_id}', lvl='warn')
         else:
@@ -191,6 +192,7 @@ class ResponseCommandHandler:
     def recvhandle_init(cli, dat):
         server_public = bytes.fromhex(dat[::-1][:64][::-1])
         cli.agent.enc_key = x25519.scalar_mult(cli.agent.enc_secret, server_public)
+        cli.agent.is_enc = True
         cli.display("Established shared secret", lvl="prod")
 
     def recvhandle_authresult(cli, dat):

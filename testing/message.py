@@ -26,7 +26,7 @@ class Message:
 
     NEEDS_ACK = {
         "DAT": 1,
-        "DhkeInit": 1,
+        "DhkeInit": 0,
         "Unencrypted": 0,
         "AuthToAcc": 1,
         "UnknownDomain": 0,
